@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies (Poetry)
         run: |
-          poetry install --no-interaction --no-ansi
+          poetry install --no-interaction --no-ansi --with dev
 
       - name: Lint with flake8
         run: |
