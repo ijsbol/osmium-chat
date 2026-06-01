@@ -1,0 +1,6 @@
+# Documentation build dependencies (used by Read the Docs).
+# The package itself (and its runtime deps) is installed separately via
+# `.readthedocs.yaml` (pip install of the project), so only the doc toolchain
+# is listed here.
+sphinx>=8.0
+furo>=2024.8.6
