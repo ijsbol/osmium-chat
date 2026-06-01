@@ -39,4 +39,8 @@ jobs:
 
       - name: Test with pytest
         run: |
-          poetry run pytest
+          # Don't fail the job when there are no tests yet (pytest exit code 5).
+          code=0
+          poetry run pytest || code=$?
+          if [ "$code" -eq 5 ]; then exit 0; fi
+          exit "$code"
