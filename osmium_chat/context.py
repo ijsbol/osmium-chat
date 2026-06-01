@@ -66,19 +66,21 @@ class Context:
         self.invoked_with = invoked_with
         self.args: list[Any] = args if args is not None else []
 
-    async def send(self, content: str, *, reply_to: int | None = None) -> None:
+    async def send(self, content: str, *, reply_to: int | None = None) -> Message:
         """Send a message to the channel this command was invoked in.
 
         A shortcut for ``ctx.channel.send(...)``.
 
         :param content: The message text to send.
         :param reply_to: Optional id of a message this should reply to.
+        :returns: The newly created message.
         """
-        await self.channel.send(content, reply_to=reply_to)
+        return await self.channel.send(content, reply_to=reply_to)
 
-    async def reply(self, content: str) -> None:
+    async def reply(self, content: str) -> Message:
         """Reply to the invoking message, threading it as a reply.
 
         :param content: The message text to send.
+        :returns: The newly created message.
         """
-        await self.channel.send(content, reply_to=self.message.id)
+        return await self.channel.send(content, reply_to=self.message.id)

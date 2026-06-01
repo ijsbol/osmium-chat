@@ -23,6 +23,35 @@ class Bot:
 
     Holds connection state, the registered event listeners, and the
     authenticated :class:`~osmium_chat.user.user.User` once connected.
+
+    **Events**
+
+    Listeners are registered with :meth:`on` and receive the arguments the event
+    is dispatched with. The built-in events are:
+
+    - ``connect`` — fired with no arguments once the bot has authorized.
+    - ``message`` — fired with the :class:`~osmium_chat.context.Context` for
+      *every* inbound message, regardless of where it came from.
+    - ``guild_message`` — fired with the context when the message was sent in a
+      community (guild) channel.
+    - ``dm_message`` — fired with the context when the message was a direct
+      message to the bot.
+    - ``command_error`` — fired with ``(ctx, error)`` when a command lookup or
+      invocation fails.
+
+    .. code-block:: python
+
+        @bot.on("message")
+        async def on_message(ctx: Context) -> None:
+            ...
+
+        @bot.on("guild_message")
+        async def on_guild_message(ctx: Context) -> None:
+            ...
+
+        @bot.on("dm_message")
+        async def on_dm_message(ctx: Context) -> None:
+            ...
     """
 
     __slots__: tuple[str, ...] = (
@@ -148,8 +177,8 @@ class Bot:
         if update.message is None or update.message.chat_ref is None:
             return
 
-        message = Message(update.message)
         author = User(update.author, self._client) if update.author else None
+        message = Message(update.message, self._client, author=author)
         channel = Channel(update.message.chat_ref, self._client)
         ctx = Context(
             bot=self,
@@ -160,6 +189,14 @@ class Bot:
         )
 
         await self.dispatch("message", ctx)
+        # Fire the finer-grained event for where the message came from. A
+        # ``chat_ref`` carrying a ``channel`` is a community (guild) channel; one
+        # carrying a ``user`` is a direct message.
+        chat_ref = update.message.chat_ref
+        if chat_ref.channel is not None:
+            await self.dispatch("guild_message", ctx)
+        elif chat_ref.user is not None:
+            await self.dispatch("dm_message", ctx)
 
         # Never react to our own messages, to avoid command loops.
         if self.user is not None and message.author_id == self.user.id:

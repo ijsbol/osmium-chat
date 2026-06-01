@@ -3,6 +3,7 @@
 
 __all__: tuple[str, ...] = (
     "OsmiumChatError",
+    "RequestError",
     "CommandError",
     "CommandNotFound",
     "ArgumentError",
@@ -14,6 +15,22 @@ __all__: tuple[str, ...] = (
 
 class OsmiumChatError(Exception):
     """Base class for every exception raised by ``osmium_chat``."""
+
+
+class RequestError(OsmiumChatError):
+    """The gateway returned an error in response to a request.
+
+    Raised from :meth:`~osmium_chat.client.Client.request` when the matching
+    ``RpcResult`` carries an error instead of a result payload.
+    """
+
+    def __init__(self, code: int, message: str) -> None:
+        """:param code: The server's numeric error code.
+        :param message: The server's human-readable error message.
+        """
+        self.code = code
+        self.message = message
+        super().__init__(f"Request failed ({code}): {message}")
 
 
 class CommandError(OsmiumChatError):

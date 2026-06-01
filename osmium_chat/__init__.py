@@ -22,18 +22,27 @@ __version__: str = _get_version()
 # Imported after ``__version__`` is defined, since the submodules read it at
 # import time.
 from osmium_chat.bot import Bot
-from osmium_chat.channel import Channel
+from osmium_chat.channel import Channel, ChannelType
 from osmium_chat.commands import Command
+from osmium_chat.community import Community
 from osmium_chat.context import Context
 from osmium_chat.message import Message
+from osmium_chat.permissions import CommunityPermission
+from osmium_chat.photo import Photo
+from osmium_chat.role import Role
 from osmium_chat.user.user import User
 
 __all__: tuple[str, ...] = (
     "__version__",
     "Bot",
     "Channel",
+    "ChannelType",
     "Command",
+    "Community",
+    "CommunityPermission",
     "Context",
     "Message",
+    "Photo",
+    "Role",
     "User",
 )

@@ -31,6 +31,26 @@ Messages
 
 .. automodule:: osmium_chat.message
 
+Communities
+-----------
+
+.. automodule:: osmium_chat.community
+
+Roles
+-----
+
+.. automodule:: osmium_chat.role
+
+Permissions
+-----------
+
+.. automodule:: osmium_chat.permissions
+
+Utilities
+---------
+
+.. automodule:: osmium_chat.utils
+
 Errors
 ------
 
