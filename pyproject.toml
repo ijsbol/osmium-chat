@@ -1,37 +1,31 @@
-[project]
-name = "osmium_chat"
-version = "0.1.0"
+[tool.poetry]
+name = "osmium-chat"
+version = "0.1.1"
 description = "A Python API wrapper for Osmium."
 readme = "README.md"
 license = "MIT"
-authors = [
-    { name = "abigail phoebe", email = "abigail@phoebe.sh" },
-]
-requires-python = ">=3.13"
-dependencies = [
-    "osmium-protos>=2.0.0",
-    "websockets>=16.0",
-]
+authors = ["abigail phoebe <abigail@phoebe.sh>"]
+packages = [{ include = "osmium_chat" }]
 
-[project.urls]
+[tool.poetry.urls]
 Homepage = "https://github.com/ijsbol/osmium-chat"
 "Bug Tracker" = "https://github.com/ijsbol/osmium-chat/issues"
 
-[dependency-groups]
-dev = [
-    "isort>=8.0.1",
-    "ruff>=0.15.15",
-    "twine>=6.2.0,<7.0.0",
-    "build>=1.4.0,<2.0.0",
-    "flake8>=7.3.0,<8.0.0",
-]
+[tool.poetry.dependencies]
+python = ">=3.13,<4.0"
+osmium-protos = ">=2.0.0"
+websockets = ">=16.0"
+
+[tool.poetry.group.dev.dependencies]
+isort = ">=8.0.1"
+ruff = ">=0.15.15"
+twine = ">=6.2.0,<7.0.0"
+build = ">=1.4.0,<2.0.0"
+flake8 = ">=7.3.0,<8.0.0"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["osmium_chat"]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.ruff.lint]
 select = ["COM812"]

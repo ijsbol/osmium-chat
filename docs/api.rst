@@ -11,6 +11,31 @@ Client
 
 .. automodule:: osmium_chat.client
 
+Commands
+--------
+
+.. automodule:: osmium_chat.commands
+
+Context
+-------
+
+.. automodule:: osmium_chat.context
+
+Channels
+--------
+
+.. automodule:: osmium_chat.channel
+
+Messages
+--------
+
+.. automodule:: osmium_chat.message
+
+Errors
+------
+
+.. automodule:: osmium_chat.errors
+
 Users
 -----
 

@@ -6,7 +6,7 @@ from osmium_chat import __version__
 
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
-from osmium_protos import unwrap, wrap, PB_Initialize, PB_Authorization, PB_Authorize
+from osmium_protos import unwrap, wrap, PB_Initialize, PB_Authorization, PB_Authorize, PB_UpdateMessageCreated
 from osmium_protos.osmium.client.auth import Authorization
 from osmium_chat.user.user import User
 
@@ -56,9 +56,14 @@ class Client:
     async def _handle_msg(self, message: Any) -> None:
         """Process a single decoded inbound message.
 
+        Routes ``message_created`` updates into the bot's command pipeline; all
+        other messages are logged for now.
+
         :param message: The unwrapped protobuf message.
         """
         self._logger.debug(f"Received message: {message}")
+        if isinstance(message, PB_UpdateMessageCreated):
+            await self.bot.process_commands(message)
 
     async def _handle_ws(self, **kwargs: Any) -> None:
         """Read and dispatch inbound messages until the connection closes."""

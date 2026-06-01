@@ -1,10 +1,16 @@
+import asyncio
 from collections.abc import Awaitable, Callable
 from logging import Logger
 from typing import Any, TypeVar
 
-from osmium_protos import PB_UseInvite
+from osmium_protos import PB_UpdateMessageCreated, PB_UseInvite
 
+from osmium_chat.channel import Channel
 from osmium_chat.client import Client
+from osmium_chat.commands import Command, CommandCallback, StringView
+from osmium_chat.context import Context
+from osmium_chat.errors import CommandError, CommandNotFound
+from osmium_chat.message import Message
 from osmium_chat.user.user import User
 
 
@@ -24,6 +30,7 @@ class Bot:
         "_logger",
         "_client",
         "_listeners",
+        "_commands",
         "user",
     )
 
@@ -48,6 +55,7 @@ class Bot:
             logger=self._logger,
         )
         self._listeners: dict[str, list[EventHandler]] = {}
+        self._commands: dict[str, Command] = {}
         self.user: User | None = None
 
     def on(self, event: str) -> Callable[[EH], EH]:
@@ -68,10 +76,6 @@ class Bot:
             return func
         return decorator
 
-    def on_connect(self) -> Callable[[EH], EH]:
-        """Register a listener fired once the bot is connected and authorized."""
-        return self.on("connect")
-
     async def dispatch(self, event: str, *args: Any, **kwargs: Any) -> None:
         """Invoke every listener registered for ``event``.
 
@@ -83,6 +87,106 @@ class Bot:
                 await handler(*args, **kwargs)
             except Exception:
                 self._logger.exception("Error in '%s' event handler", event)
+
+    def command(
+        self,
+        name: str | None = None,
+        *,
+        aliases: tuple[str, ...] = (),
+    ) -> Callable[[CommandCallback], Command]:
+        """Register a coroutine as a command.
+
+        The decorated coroutine receives a :class:`~osmium_chat.context.Context`
+        as its first argument; every parameter after that is parsed from the
+        message text and converted to its annotated type. Parameters with a
+        default become optional, a keyword-only parameter (after ``*``) consumes
+        the rest of the message, and ``*args`` collects all remaining tokens.
+
+        .. code-block:: python
+
+            @bot.command("say")
+            async def say(ctx: Context, *, words: str = "...") -> None:
+                await ctx.channel.send(words)
+
+        :param name: The command name; defaults to the function name.
+        :param aliases: Additional names the command also responds to.
+        """
+        def decorator(func: CommandCallback) -> Command:
+            command = Command(func, name=name, aliases=aliases)
+            self.add_command(command)
+            return command
+        return decorator
+
+    def add_command(self, command: Command) -> None:
+        """Register a command under its name and every alias.
+
+        :param command: The command to register.
+        :raises ValueError: If the name or an alias is already registered.
+        """
+        for key in (command.name, *command.aliases):
+            if key in self._commands:
+                raise ValueError(f"Command name {key!r} is already registered")
+            self._commands[key] = command
+
+    def get_command(self, name: str) -> Command | None:
+        """Look up a command by name or alias.
+
+        :param name: The name or alias to resolve.
+        """
+        return self._commands.get(name)
+
+    async def process_commands(self, update: PB_UpdateMessageCreated) -> None:
+        """Turn an inbound message into a command invocation.
+
+        Builds the :class:`~osmium_chat.context.Context`, fires the ``message``
+        event, and — if the message starts with the prefix and names a known
+        command — parses its arguments and invokes it. Command failures are
+        surfaced through the ``command_error`` event.
+
+        :param update: The decoded ``message_created`` payload from the gateway.
+        """
+        if update.message is None or update.message.chat_ref is None:
+            return
+
+        message = Message(update.message)
+        author = User(update.author) if update.author else None
+        channel = Channel(update.message.chat_ref, self._client)
+        ctx = Context(
+            bot=self,
+            message=message,
+            author=author,
+            channel=channel,
+            prefix=self.prefix,
+        )
+
+        await self.dispatch("message", ctx)
+
+        # Never react to our own messages, to avoid command loops.
+        if self.user is not None and message.author_id == self.user.id:
+            return
+
+        content = message.content
+        if not content.startswith(self.prefix):
+            return
+
+        view = StringView(content[len(self.prefix):])
+        name = view.get_word()
+        if not name:
+            return
+
+        ctx.invoked_with = name
+        command = self.get_command(name)
+        if command is None:
+            await self.dispatch("command_error", ctx, CommandNotFound(name))
+            return
+
+        try:
+            await command.invoke(ctx, view)
+        except CommandError as error:
+            await self.dispatch("command_error", ctx, error)
+        except Exception as error:
+            self._logger.exception("Unhandled error in command %r", name)
+            await self.dispatch("command_error", ctx, error)
 
     async def use_invite(self, invite_code: str) -> None:
         """Redeem an invite code on behalf of the bot.
@@ -101,3 +205,13 @@ class Bot:
         :param token: The authorization token for this bot.
         """
         await self._client.connect(token)
+
+    def run(self, token: str) -> None:
+        """Start the bot's event loop and connect, blocking until it closes.
+
+        A synchronous convenience wrapper around :meth:`connect` for use as a
+        program's entry point.
+
+        :param token: The authorization token for this bot.
+        """
+        asyncio.run(self.connect(token))
