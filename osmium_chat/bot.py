@@ -149,7 +149,7 @@ class Bot:
             return
 
         message = Message(update.message)
-        author = User(update.author) if update.author else None
+        author = User(update.author, self._client) if update.author else None
         channel = Channel(update.message.chat_ref, self._client)
         ctx = Context(
             bot=self,

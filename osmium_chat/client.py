@@ -94,7 +94,7 @@ class Client:
         self.__session_id = message.session_id
         self.__token = message.token
         if message.user:
-            self.bot.user = User(message.user)
+            self.bot.user = User(message.user, self)
 
     async def connect(self, token: str) -> None:
         """Open the connection, run the handshake, and process messages.
