@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "osmium-chat"
-version = "0.1.4"
+version = "0.1.5"
 description = "A Python API wrapper for Osmium."
 readme = "README.md"
 license = "MIT"

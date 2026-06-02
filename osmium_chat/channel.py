@@ -176,6 +176,45 @@ class Channel:
             author=author,
         )
 
+    async def send_file(
+        self,
+        data: bytes,
+        filename: str,
+        *,
+        mimetype: str = "application/octet-stream",
+        reply_to: int | None = None,
+    ) -> "Message":
+        """Upload ``data`` and send it as a file attachment to this channel.
+
+        :param data: The raw file bytes to upload and attach.
+        :param filename: The file name shown to recipients.
+        :param mimetype: The MIME type of the file; defaults to
+            ``application/octet-stream``.
+        :param reply_to: Optional id of a message this should reply to.
+        :returns: The newly created message carrying the file attachment.
+        :raises RequestError: If the gateway rejects the upload or send.
+        """
+        from osmium_chat.message import Message
+
+        _, media_ref = await self._client.upload_file(data, filename, mimetype)
+        result = await self._client.request(PB_SendMessage(
+            chat_ref=self._chat_ref,
+            media=[media_ref],
+            reply_to=reply_to,
+        ))
+        author = self._client.bot.user
+        sent = result.sent_message
+        return Message(
+            PB_Message(
+                chat_ref=self._chat_ref,
+                message_id=sent.message_id if sent is not None else 0,
+                author_id=author.id if author is not None else 0,
+                media=[],
+            ),
+            self._client,
+            author=author,
+        )
+
     async def edit(
         self,
         *,

@@ -5,7 +5,7 @@ A Python API wrapper for [Osmium](https://osmium.chat).
 ![enbyware](https://pride-badges.pony.workers.dev/static/v1?label=enbyware&labelColor=%23555&stripeWidth=8&stripeColors=FCF434%2CFFFFFF%2C9C59D1%2C2C2C2C)
 
 > [!NOTE]
-> the code was written by humans, the documentation was ai-assisted as i suck at writing documentation lol
+> the documentation was ai-assisted as i suck at writing documentation lol
 
 ---
 
@@ -46,6 +46,8 @@ async def say(ctx: Context, *, words: str) -> None:
 bot.run(token="YOUR_TOKEN")
 ```
 
+---
+
 ### Rich text formatting
 
 ```python
@@ -66,6 +68,7 @@ await ctx.channel.send(Content(
 - **Rich text** — `Bold`, `Italic`, `Underline`, `Code`, `CodeBlock`, `Spoiler`, `TextUrl`, and more
 - **Communities** — create/manage channels, categories, and roles
 - **Invites** — create, list, look up, and revoke invite links
+- **File attachments** — upload files from bytes, download and save attachments to disk
 - **Events** — `connect`, `message`, `guild_message`, `dm_message`, `command_error`
 
 ---

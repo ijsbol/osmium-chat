@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Coroutine
 from logging import Logger
+import os
 import platform
 from typing import TYPE_CHECKING, Any, cast
 
@@ -13,10 +14,16 @@ from osmium_protos import (
     wrap,
     PB_Authorization,
     PB_Authorize,
+    PB_FileMetadata,
+    PB_FileMetadataMetadataFile,
     PB_Initialize,
+    PB_MediaRef,
+    PB_MediaRefUploadedFile,
     PB_RpcResult,
     PB_ServerMessage,
     PB_UpdateMessageCreated,
+    PB_UploadFilePart,
+    PB_UploadedFileRef,
 )
 from osmium_protos.osmium.client.auth import Authorization
 from osmium_chat.errors import RequestError
@@ -199,6 +206,53 @@ class Client:
         self.__token = message.token
         if message.user:
             self.bot.user = User(message.user, self)
+
+    # 512 KiB per part — small enough for reliable delivery over WebSocket.
+    _UPLOAD_CHUNK_SIZE: int = 512 * 1024
+
+    async def upload_file(
+        self,
+        data: bytes,
+        filename: str,
+        mimetype: str = "application/octet-stream",
+    ) -> tuple[PB_UploadedFileRef, PB_MediaRef]:
+        """Upload ``data`` to the Osmium media service in chunks.
+
+        Splits ``data`` into parts of up to :attr:`_UPLOAD_CHUNK_SIZE` bytes,
+        sends each part sequentially, and returns the server-side ref together
+        with a ready-to-use :class:`~osmium_protos.PB_MediaRef` for attaching
+        to a :class:`~osmium_protos.PB_SendMessage`.
+
+        :param data: The raw file bytes to upload.
+        :param filename: The file name that will be shown to recipients.
+        :param mimetype: The MIME type of the file; defaults to
+            ``application/octet-stream``.
+        :returns: A ``(PB_UploadedFileRef, PB_MediaRef)`` pair.
+        :raises RequestError: If the gateway rejects any part.
+        """
+        upload_id = int.from_bytes(os.urandom(8), "big")
+        chunk_size = self._UPLOAD_CHUNK_SIZE
+        parts = [data[i:i + chunk_size] for i in range(0, max(len(data), 1), chunk_size)]
+
+        for index, chunk in enumerate(parts):
+            await self.request(PB_UploadFilePart(
+                upload_id=upload_id,
+                part=index,
+                data=chunk,
+            ))
+
+        file_ref = PB_UploadedFileRef(
+            id=upload_id,
+            name=filename,
+            part_count=len(parts),
+        )
+        media_ref = PB_MediaRef(uploaded=PB_MediaRefUploadedFile(
+            file=file_ref,
+            filename=filename,
+            mimetype=mimetype,
+            metadata=PB_FileMetadata(file=PB_FileMetadataMetadataFile()),
+        ))
+        return file_ref, media_ref
 
     async def connect(self, token: str) -> None:
         """Open the connection, run the handshake, and process messages.

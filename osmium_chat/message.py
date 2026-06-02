@@ -9,6 +9,7 @@ from osmium_protos import (
 )
 
 from osmium_chat.content import Content, parse_content
+from osmium_chat.file import File
 from osmium_chat.user.user import User
 
 if TYPE_CHECKING:
@@ -36,6 +37,7 @@ class Message:
         "author",
         "chat_ref",
         "reply_to",
+        "attachments",
         "_client",
     )
 
@@ -60,6 +62,11 @@ class Message:
         self.author: User | None = author
         self.chat_ref: PB_ChatRef | None = message.chat_ref
         self.reply_to: int | None = message.reply_to
+        self.attachments: list[File] = [
+            File(media.file.file, client)
+            for media in message.media
+            if media.file is not None and media.file.file is not None
+        ]
         self._client = client
 
     async def edit(self, content: "str | Content") -> "Message":
@@ -98,6 +105,45 @@ class Message:
             chat_ref=self.chat_ref,
             message_ids=[self.id],
         ))
+
+    async def reply_file(
+        self,
+        data: bytes,
+        filename: str,
+        *,
+        mimetype: str = "application/octet-stream",
+    ) -> "Message":
+        """Upload ``data`` and send it as a file reply to this message.
+
+        :param data: The raw file bytes to upload and attach.
+        :param filename: The file name shown to recipients.
+        :param mimetype: The MIME type of the file; defaults to
+            ``application/octet-stream``.
+        :returns: The newly created reply message carrying the file attachment.
+        :raises ValueError: If the message has no chat ref to reply into.
+        :raises RequestError: If the gateway rejects the upload or send.
+        """
+        if self.chat_ref is None:
+            raise ValueError("Cannot reply to a message without a chat ref")
+        _, media_ref = await self._client.upload_file(data, filename, mimetype)
+        result = await self._client.request(PB_SendMessage(
+            chat_ref=self.chat_ref,
+            media=[media_ref],
+            reply_to=self.id,
+        ))
+        author = self._client.bot.user
+        sent = result.sent_message
+        return Message(
+            PB_Message(
+                chat_ref=self.chat_ref,
+                message_id=sent.message_id if sent is not None else 0,
+                author_id=author.id if author is not None else 0,
+                media=[],
+                reply_to=self.id,
+            ),
+            self._client,
+            author=author,
+        )
 
     async def reply(self, content: "str | Content") -> "Message":
         """Send a message to this message's conversation, threaded as a reply.

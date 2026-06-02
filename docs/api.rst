@@ -84,3 +84,5 @@ Media
 -----
 
 .. automodule:: osmium_chat.photo
+
+.. automodule:: osmium_chat.file
