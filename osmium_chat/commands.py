@@ -802,13 +802,16 @@ class Commands:
     register the subclass (uninitialised) with
     :meth:`~osmium_chat.bot.Bot.add_commands`.
 
+    The default ``__init__`` accepts only ``bot``. Override it to receive
+    additional arguments — they are forwarded from the
+    :meth:`~osmium_chat.bot.Bot.add_commands` call:
+
     .. code-block:: python
 
         from osmium_chat import Bot, Context, Message, commands
 
         class MyCommands(commands.Commands):
-            def __init__(self, bot: Bot) -> None:
-                self.bot = bot
+            # No extra args — use the inherited __init__.
 
             @commands.listen("connect")
             async def on_connect(self) -> None:
@@ -830,8 +833,19 @@ class Commands:
             async def help(self, ctx: Context) -> None:
                 await ctx.channel.send("Commands: ping, info, help")
 
+        class GreetCommands(commands.Commands):
+            # Extra constructor argument supplied via add_commands.
+            def __init__(self, bot: Bot, greeting: str = "Hello") -> None:
+                super().__init__(bot)
+                self.greeting = greeting
+
+            @commands.command("greet")
+            async def greet(self, ctx: Context) -> None:
+                await ctx.channel.send(self.greeting)
+
         bot = Bot(prefix="!", client_id=12345)
         bot.add_commands(MyCommands)
+        bot.add_commands(GreetCommands, greeting="Howdy")
         bot.run(token="...")
     """
 

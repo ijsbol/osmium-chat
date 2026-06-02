@@ -130,15 +130,36 @@ class Bot:
                 raise ValueError(f"Command name {key!r} is already registered")
             self._commands[key] = command
 
-    def add_commands(self, cls: type[Commands]) -> None:
+    def add_commands(self, cls: type[Commands], *args: Any, **kwargs: Any) -> None:
         """Instantiate a :class:`~osmium_chat.commands.Commands` subclass and
         register all its decorated commands and listeners.
 
+        The bot calls ``cls(self, *args, **kwargs)``, so any extra arguments
+        are forwarded directly to the subclass ``__init__`` after ``bot``.
+        This lets command collections accept configuration at registration
+        time without needing globals or post-init setters:
+
+        .. code-block:: python
+
+            class Greeter(commands.Commands):
+                def __init__(self, bot: Bot, greeting: str) -> None:
+                    super().__init__(bot)
+                    self.greeting = greeting
+
+                @commands.command("hi")
+                async def hi(self, ctx: Context) -> None:
+                    await ctx.channel.send(self.greeting)
+
+            bot.add_commands(Greeter, greeting="Howdy!")
+
         :param cls: An uninitialised :class:`~osmium_chat.commands.Commands`
             subclass.
+        :param args: Extra positional arguments passed to ``cls.__init__``
+            after ``bot``.
+        :param kwargs: Extra keyword arguments passed to ``cls.__init__``.
         :raises ValueError: If any command name or alias is already registered.
         """
-        instance = cls(self)
+        instance = cls(self, *args, **kwargs)
         for attr_name in dir(cls):
             if attr_name.startswith("_"):
                 continue
