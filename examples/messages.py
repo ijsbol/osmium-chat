@@ -17,6 +17,7 @@ from logging import DEBUG, Formatter, StreamHandler, getLogger
 from osmium_chat.bot import Bot
 from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Strikethrough, Underline
 from osmium_chat.context import Context
+from osmium_chat.mentions import UserMention
 
 
 logger = getLogger("osmium_chat")
@@ -25,7 +26,7 @@ _handler = StreamHandler()
 _handler.setFormatter(Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
 logger.addHandler(_handler)
 
-bot = Bot(prefix="!", client_id=150896, logger=logger)
+bot = Bot(prefix="!", client_id=00000, logger=logger)
 
 
 @bot.on("connect")
@@ -81,7 +82,7 @@ async def whoami(ctx: Context) -> None:
     if author is None:
         await ctx.reply("I don't know who you are!")
         return
-    await ctx.reply(f"You are {author.name} (id {author.id}).")
+    await ctx.channel.send(Content("You are ", UserMention(author), "!"))
 
 
 if __name__ == "__main__":

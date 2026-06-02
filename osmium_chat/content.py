@@ -2,10 +2,11 @@
 
 Formatting nodes — :class:`Bold`, :class:`Italic`, :class:`Underline`,
 :class:`Strikethrough`, :class:`Code`, :class:`CodeBlock`, :class:`Spoiler`,
-and :class:`TextUrl` — can be nested freely and embedded inside a
-:class:`Content` using either the constructor or f-string interpolation::
+:class:`TextUrl`, and :class:`CustomEmoji <osmium_chat.emoji.CustomEmoji>` — can
+be nested freely and embedded inside a :class:`Content` using either the
+constructor or f-string interpolation::
 
-    from osmium_chat.content import Bold, Content, Italic
+    from osmium_chat.content import Bold, Content, Italic, UnicodeEmoji
 
     # constructor form
     msg = Content("Hello, ", Bold("world"), "!")
@@ -15,6 +16,9 @@ and :class:`TextUrl` — can be nested freely and embedded inside a
 
     # nesting
     msg = Content(f"{Bold(Italic('important'))}")
+
+    # unicode emoji (rendered as plain text)
+    msg = Content("Congrats! ", UnicodeEmoji("🎉"))
 
 Each node tree is serialized to a flat text string plus a matching list of
 :class:`~osmium_protos.PB_MessageEntity` offset/length spans — the wire
@@ -38,9 +42,38 @@ __all__: tuple[str, ...] = (
     "Strikethrough",
     "TextUrl",
     "Underline",
+    "UnicodeEmoji",
     "parse_content",
     "plain_text",
 )
+
+class UnicodeEmoji:
+    """A standard Unicode emoji for use in :class:`Content`.
+
+    When passed to :class:`Content`, it is treated as plain text — the emoji
+    character is embedded in the message string without any formatting entity.
+
+    .. code-block:: python
+
+        Content("Congrats! ", UnicodeEmoji("🎉"))
+
+    :param emoji: The Unicode emoji character(s).
+    """
+
+    __slots__ = ("emoji",)
+
+    def __init__(self, emoji: str) -> None:
+        self.emoji: str = emoji
+
+    def __str__(self) -> str:
+        return self.emoji
+
+    def __format__(self, _: str) -> str:
+        return self.emoji
+
+    def __repr__(self) -> str:
+        return f"UnicodeEmoji({self.emoji!r})"
+
 
 # Unicode Private Use Area sentinel used to embed nodes inside f-strings.
 # When __format__ is called on a node (e.g. f"{Bold('hi')}"), we register the
@@ -61,7 +94,9 @@ def _expand(parts: tuple) -> tuple:
     """Replace sentinel strings in *parts* with the registered node objects."""
     out: list = []
     for part in parts:
-        if isinstance(part, str) and _SENT in part:
+        if isinstance(part, UnicodeEmoji):
+            out.append(part.emoji)
+        elif isinstance(part, str) and _SENT in part:
             segments = part.split(_SENT)
             for i, seg in enumerate(segments):
                 if i % 2 == 0:
@@ -229,7 +264,7 @@ class Content:
 
     __slots__ = ("_parts", "_wire_entities")
 
-    def __init__(self, *parts: "str | _FormattingNode") -> None:
+    def __init__(self, *parts: "str | _FormattingNode | UnicodeEmoji") -> None:
         self._parts = _expand(parts)
         self._wire_entities: "list[PB_MessageEntity] | None" = None
 
@@ -258,6 +293,17 @@ def _node_plain(node: "str | _FormattingNode") -> str:
     return "".join(_node_plain(p) for p in node._parts)
 
 
+def _utf16_len(s: str) -> int:
+    """Return the number of UTF-16 code units in *s*.
+
+    Osmium encodes entity offsets in UTF-16 code units. Characters outside the
+    Basic Multilingual Plane (e.g. most emoji: 😀, 🎉) are a single Python
+    ``str`` character but occupy *two* UTF-16 code units, so ``len()`` alone
+    gives wrong offsets for any text containing such characters.
+    """
+    return len(s.encode("utf-16-le")) >> 1
+
+
 def _collect_entities(
     parts: tuple,
     offset: int,
@@ -266,9 +312,9 @@ def _collect_entities(
     pos = offset
     for part in parts:
         if isinstance(part, str):
-            pos += len(part)
+            pos += _utf16_len(part)
         else:
-            plain_len = len(_node_plain(part))
+            plain_len = _utf16_len(_node_plain(part))
             out.append(part._make_entity(pos, plain_len))
             _collect_entities(part._parts, pos, out)
             pos += plain_len

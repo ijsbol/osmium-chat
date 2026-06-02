@@ -1,24 +1,38 @@
 from typing import TYPE_CHECKING
 
 from osmium_protos import (
+    PB_AddReaction,
     PB_ChatRef,
     PB_DeleteMessage,
     PB_EditMessage,
     PB_Message,
+    PB_ReactionEmoji,
+    PB_RemoveReaction,
     PB_SendMessage,
 )
 
-from osmium_chat.content import Content, parse_content
+from osmium_chat.content import Content, UnicodeEmoji, parse_content
 from osmium_chat.file import File
+from osmium_chat.reaction import Reaction
 from osmium_chat.user.user import User
 
 if TYPE_CHECKING:
     from osmium_chat.client import Client
+    from osmium_chat.emoji import CustomEmoji
 
 
 __all__: tuple[str, ...] = (
     "Message",
 )
+
+
+def _to_pb_reaction_emoji(emoji: "CustomEmoji | UnicodeEmoji | str") -> PB_ReactionEmoji:
+    from osmium_chat.emoji import CustomEmoji as _CustomEmoji
+    if isinstance(emoji, str):
+        return PB_ReactionEmoji(unicode_emoji=emoji)
+    if isinstance(emoji, UnicodeEmoji):
+        return PB_ReactionEmoji(unicode_emoji=emoji.emoji)
+    return PB_ReactionEmoji(custom_emoji=emoji.id)
 
 
 class Message:
@@ -38,6 +52,7 @@ class Message:
         "chat_ref",
         "reply_to",
         "attachments",
+        "reactions",
         "_client",
     )
 
@@ -51,7 +66,8 @@ class Message:
         """Build a message from a protobuf payload.
 
         :param message: The raw ``PB_Message`` to read fields from.
-        :param client: The client used to edit, delete, and reply to the message.
+        :param client: The client used to edit, delete, reply, and react to
+            the message.
         :param author: The resolved :class:`~osmium_chat.user.user.User` who sent
             the message, if the gateway supplied one.
         """
@@ -67,6 +83,7 @@ class Message:
             for media in message.media
             if media.file is not None and media.file.file is not None
         ]
+        self.reactions: list[Reaction] = []
         self._client = client
 
     async def edit(self, content: "str | Content") -> "Message":
@@ -104,6 +121,45 @@ class Message:
         await self._client.send_pb(PB_DeleteMessage(
             chat_ref=self.chat_ref,
             message_ids=[self.id],
+        ))
+
+    async def add_reaction(self, emoji: "CustomEmoji | UnicodeEmoji | str") -> None:
+        """Add a reaction to this message.
+
+        Accepts a :class:`~osmium_chat.emoji.CustomEmoji`, a
+        :class:`~osmium_chat.content.UnicodeEmoji`, or a plain Unicode emoji
+        string (e.g. ``"🎉"``). A user may only add one reaction of each
+        emoji type to a message.
+
+        :param emoji: The emoji to react with.
+        :raises ValueError: If the message has no chat ref.
+        :raises RequestError: If the gateway rejects the request.
+        """
+        if self.chat_ref is None:
+            raise ValueError("Cannot react to a message without a chat ref")
+        await self._client.send_pb(PB_AddReaction(
+            chat_ref=self.chat_ref,
+            message_id=self.id,
+            emoji=_to_pb_reaction_emoji(emoji),
+        ))
+
+    async def remove_reaction(self, emoji: "CustomEmoji | UnicodeEmoji | str") -> None:
+        """Remove a previously added reaction from this message.
+
+        Accepts a :class:`~osmium_chat.emoji.CustomEmoji`, a
+        :class:`~osmium_chat.content.UnicodeEmoji`, or a plain Unicode emoji
+        string (e.g. ``"🎉"``).
+
+        :param emoji: The emoji reaction to remove.
+        :raises ValueError: If the message has no chat ref.
+        :raises RequestError: If the gateway rejects the request.
+        """
+        if self.chat_ref is None:
+            raise ValueError("Cannot remove a reaction from a message without a chat ref")
+        await self._client.send_pb(PB_RemoveReaction(
+            chat_ref=self.chat_ref,
+            message_id=self.id,
+            emoji=_to_pb_reaction_emoji(emoji),
         ))
 
     async def reply_file(

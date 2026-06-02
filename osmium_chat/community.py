@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from osmium_protos import (
+    PB_AddStickerToPack,
     PB_ChannelType,
     PB_Community,
     PB_CreateChannel,
@@ -9,10 +10,14 @@ from osmium_protos import (
     PB_EditCommunity,
     PB_GetChannels,
     PB_GetRoles,
+    PB_GetStickerFiles,
+    PB_GetStickerPack,
+    PB_StickerPackRef,
 )
 
 from osmium_chat.category import Category
 from osmium_chat.channel import Channel, ChannelType
+from osmium_chat.emoji import CustomEmoji
 from osmium_chat.errors import OsmiumChatError
 from osmium_chat.permissions import CommunityPermission
 from osmium_chat.photo import Photo
@@ -86,6 +91,7 @@ class Community:
         "channels",
         "categories",
         "roles",
+        "custom_emojis",
         "_client",
     )
 
@@ -101,8 +107,8 @@ class Community:
         """Build a community from a protobuf payload.
 
         :param community: The raw ``PB_Community`` to read fields from.
-        :param client: The client used to edit the community and manage channels
-            and roles.
+        :param client: The client used to edit the community and manage channels,
+            roles, and custom emojis.
         :param channels: The community's non-category channels, if already known.
         :param categories: The community's categories, if already known.
         :param roles: The community's roles, if already known.
@@ -116,6 +122,7 @@ class Community:
         self.channels: list[Channel] = channels if channels is not None else []
         self.categories: list[Category] = categories if categories is not None else []
         self.roles: list[Role] = roles if roles is not None else []
+        self.custom_emojis: list[CustomEmoji] = []
         self._client = client
 
     @classmethod
@@ -326,3 +333,87 @@ class Community:
             if roles is not None else []
         )
         return self.roles
+
+    async def fetch_custom_emojis(self) -> list[CustomEmoji]:
+        """Fetch this community's custom emojis from the gateway.
+
+        Requests the community's emoji sticker pack, then fetches full file
+        metadata via a second request to resolve emoji names. The result is
+        cached on :attr:`custom_emojis`, replacing whatever was there before.
+
+        :returns: The community's custom emojis.
+        :raises RequestError: If the gateway rejects either request.
+        """
+        result = await self._client.request(
+            PB_GetStickerPack(pack=PB_StickerPackRef(id=self.id))
+        )
+        pack = result.sticker_pack
+        if pack is None:
+            self.custom_emojis = []
+            return []
+
+        sticker_ids = [s.file_id for s in pack.stickers]
+        if not sticker_ids:
+            self.custom_emojis = []
+            return []
+
+        # GetStickerPack returns stub File objects (file_id only). Fetch the
+        # full file records so we have filename / metadata.custom_emoji.emoji.
+        files_result = await self._client.request(
+            PB_GetStickerFiles(sticker_ids=sticker_ids)
+        )
+        full_files = files_result.files
+        files_by_id = (
+            {f.file_id: f for f in full_files.files}
+            if full_files is not None else {}
+        )
+
+        self.custom_emojis = []
+        for sticker in pack.stickers:
+            full = files_by_id.get(sticker.file_id, sticker)
+            if full.metadata and full.metadata.custom_emoji:
+                name = full.metadata.custom_emoji.emoji or full.filename or str(full.file_id)
+            else:
+                name = full.filename or str(full.file_id)
+            self.custom_emojis.append(CustomEmoji(
+                emoji_id=full.file_id,
+                name=name,
+                community_id=self.id,
+                pack_id=pack.id,
+                client=self._client,
+            ))
+        return self.custom_emojis
+
+    async def create_custom_emoji(
+        self,
+        image: bytes,
+        name: str,
+        *,
+        mimetype: str = "image/png",
+    ) -> CustomEmoji:
+        """Upload an image and add it as a custom emoji for this community.
+
+        Snapshots the existing emoji ids, uploads ``image``, adds it to the
+        community's emoji sticker pack, re-fetches, and returns the newly
+        created :class:`~osmium_chat.emoji.CustomEmoji` with its
+        server-assigned id.
+
+        :param image: Raw image bytes (PNG or WebP recommended).
+        :param name: Short name for the emoji, used as ``:<name>:`` in messages.
+        :param mimetype: MIME type of the image; defaults to ``"image/png"``.
+        :returns: The newly created custom emoji.
+        :raises RequestError: If the gateway rejects the upload or pack add.
+        :raises OsmiumChatError: If the emoji was created but cannot be located
+            in the re-fetched emoji list.
+        """
+        before = {e.id for e in await self.fetch_custom_emojis()}
+        sticker = await self._client.upload_emoji_image(image, name, mimetype, self.id)
+        await self._client.request(PB_AddStickerToPack(
+            pack=PB_StickerPackRef(id=self.id),
+            sticker=sticker,
+        ))
+        await self.fetch_custom_emojis()
+        created = next((e for e in self.custom_emojis if e.id not in before), None)
+        if created is None:
+            raise OsmiumChatError(f"Created emoji {name!r} could not be located")
+        return created

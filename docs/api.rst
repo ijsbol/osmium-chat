@@ -36,6 +36,11 @@ Messages
 
 .. automodule:: osmium_chat.message
 
+Reactions
+---------
+
+.. automodule:: osmium_chat.reaction
+
 Formatting
 ----------
 
@@ -45,6 +50,11 @@ Communities
 -----------
 
 .. automodule:: osmium_chat.community
+
+Custom Emoji
+------------
+
+.. automodule:: osmium_chat.emoji
 
 Invites
 -------

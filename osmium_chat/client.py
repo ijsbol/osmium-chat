@@ -15,12 +15,14 @@ from osmium_protos import (
     PB_Authorization,
     PB_Authorize,
     PB_FileMetadata,
+    PB_FileMetadataMetadataCustomEmoji,
     PB_FileMetadataMetadataFile,
     PB_Initialize,
     PB_MediaRef,
     PB_MediaRefUploadedFile,
     PB_RpcResult,
     PB_ServerMessage,
+    PB_StickerPackRef,
     PB_UpdateMessageCreated,
     PB_UploadFilePart,
     PB_UploadedFileRef,
@@ -253,6 +255,57 @@ class Client:
             metadata=PB_FileMetadata(file=PB_FileMetadataMetadataFile()),
         ))
         return file_ref, media_ref
+
+    async def upload_emoji_image(
+        self,
+        data: bytes,
+        name: str,
+        mimetype: str,
+        community_id: int,
+    ) -> PB_MediaRefUploadedFile:
+        """Upload emoji image bytes and return a ref ready for :class:`~osmium_protos.PB_AddStickerToPack`.
+
+        Splits ``data`` into chunks, uploads them, and wraps the result in a
+        :class:`~osmium_protos.PB_MediaRefUploadedFile` carrying
+        custom-emoji metadata pointing at ``community_id``'s sticker pack.
+
+        :param data: Raw image bytes (PNG or WebP recommended).
+        :param name: The emoji short name stored in the file metadata.
+        :param mimetype: The MIME type of the image.
+        :param community_id: The community whose emoji pack this image will
+            be added to; used to populate the ``pack`` metadata field.
+        :returns: A :class:`~osmium_protos.PB_MediaRefUploadedFile` ready to
+            pass as the ``sticker`` argument of
+            :class:`~osmium_protos.PB_AddStickerToPack`.
+        :raises RequestError: If the gateway rejects any part.
+        """
+        upload_id = int.from_bytes(os.urandom(8), "big")
+        chunk_size = self._UPLOAD_CHUNK_SIZE
+        parts = [data[i:i + chunk_size] for i in range(0, max(len(data), 1), chunk_size)]
+
+        for index, chunk in enumerate(parts):
+            await self.request(PB_UploadFilePart(
+                upload_id=upload_id,
+                part=index,
+                data=chunk,
+            ))
+
+        file_ref = PB_UploadedFileRef(
+            id=upload_id,
+            name=name,
+            part_count=len(parts),
+        )
+        return PB_MediaRefUploadedFile(
+            file=file_ref,
+            filename=name,
+            mimetype=mimetype,
+            metadata=PB_FileMetadata(
+                custom_emoji=PB_FileMetadataMetadataCustomEmoji(
+                    emoji=name,
+                    pack=PB_StickerPackRef(id=community_id),
+                )
+            ),
+        )
 
     async def connect(self, token: str) -> None:
         """Open the connection, run the handshake, and process messages.

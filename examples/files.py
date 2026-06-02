@@ -22,7 +22,7 @@ _handler = StreamHandler()
 _handler.setFormatter(Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
 logger.addHandler(_handler)
 
-bot = Bot(prefix="!", client_id=150896, logger=logger)
+bot = Bot(prefix="!", client_id=00000, logger=logger)
 
 
 @bot.on("connect")
