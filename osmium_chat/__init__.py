@@ -23,7 +23,7 @@ __version__: str = _get_version()
 # import time.
 from osmium_chat.bot import Bot
 from osmium_chat.channel import Channel, ChannelType
-from osmium_chat.commands import Command
+from osmium_chat.commands import Command, CommandRestriction
 from osmium_chat.community import Community
 from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Spoiler, Strikethrough, TextUrl, Underline
 from osmium_chat.invite import Invite
@@ -43,6 +43,7 @@ __all__: tuple[str, ...] = (
     "Code",
     "CodeBlock",
     "Command",
+    "CommandRestriction",
     "Community",
     "CommunityPermission",
     "Content",

@@ -11,9 +11,9 @@ from osmium_protos import PB_LookupInvite, PB_UpdateMessageCreated, PB_UseInvite
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
 from osmium_chat.community import Community
-from osmium_chat.commands import Command, CommandCallback, StringView
+from osmium_chat.commands import Command, CommandCallback, CommandRestriction, StringView
 from osmium_chat.context import Context
-from osmium_chat.errors import CommandError, CommandNotFound
+from osmium_chat.errors import CommandError, CommandNotFound, CommandRestrictionError
 from osmium_chat.message import Message
 from osmium_chat.user.user import User
 
@@ -126,6 +126,7 @@ class Bot:
         name: str | None = None,
         *,
         aliases: tuple[str, ...] = (),
+        restriction: CommandRestriction = CommandRestriction.NONE,
     ) -> Callable[[CommandCallback], Command]:
         """Register a coroutine as a command.
 
@@ -137,15 +138,17 @@ class Bot:
 
         .. code-block:: python
 
-            @bot.command("say")
+            @bot.command("say", restriction=CommandRestriction.DM_ONLY)
             async def say(ctx: Context, *, words: str = "...") -> None:
                 await ctx.channel.send(words)
 
         :param name: The command name; defaults to the function name.
         :param aliases: Additional names the command also responds to.
+        :param restriction: Where the command may be invoked; defaults to
+            :attr:`~osmium_chat.commands.CommandRestriction.NONE`.
         """
         def decorator(func: CommandCallback) -> Command:
-            command = Command(func, name=name, aliases=aliases)
+            command = Command(func, name=name, aliases=aliases, restriction=restriction)
             self.add_command(command)
             return command
         return decorator
@@ -246,6 +249,14 @@ class Bot:
         command = self.get_command(name)
         if command is None:
             await self.dispatch("command_error", ctx, CommandNotFound(name))
+            return
+
+        is_dm = ctx.community is None
+        if command.restriction is CommandRestriction.DM_ONLY and not is_dm:
+            await self.dispatch("command_error", ctx, CommandRestrictionError(command.name, command.restriction))
+            return
+        if command.restriction is CommandRestriction.COMMUNITY_ONLY and is_dm:
+            await self.dispatch("command_error", ctx, CommandRestrictionError(command.name, command.restriction))
             return
 
         try:

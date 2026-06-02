@@ -1,5 +1,6 @@
 import inspect
 from collections.abc import Awaitable, Callable
+from enum import Enum
 from types import UnionType
 from typing import TYPE_CHECKING, Any, Union, get_args, get_origin, get_type_hints
 
@@ -11,10 +12,18 @@ if TYPE_CHECKING:
 
 __all__: tuple[str, ...] = (
     "Command",
+    "CommandRestriction",
     "Parameter",
     "StringView",
     "CommandCallback",
 )
+
+
+class CommandRestriction(Enum):
+    """Where a command is allowed to be invoked."""
+    NONE = "none"
+    DM_ONLY = "dm_only"
+    COMMUNITY_ONLY = "community_only"
 
 
 CommandCallback = Callable[..., Awaitable[None]]
@@ -262,6 +271,7 @@ class Command:
         "callback",
         "aliases",
         "params",
+        "restriction",
     )
 
     def __init__(
@@ -270,16 +280,19 @@ class Command:
         *,
         name: str | None = None,
         aliases: tuple[str, ...] = (),
+        restriction: CommandRestriction = CommandRestriction.NONE,
     ) -> None:
         """:param callback: The coroutine invoked when the command runs.
         :param name: The command name; defaults to the callback's name.
         :param aliases: Additional names the command also responds to.
+        :param restriction: Where the command may be invoked.
         """
         if not inspect.iscoroutinefunction(callback):
             raise TypeError("Command callback must be a coroutine function")
         self.callback = callback
         self.name = name or callback.__name__
         self.aliases = aliases
+        self.restriction = restriction
         self.params = self._build_params(callback)
 
     @staticmethod

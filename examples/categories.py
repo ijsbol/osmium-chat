@@ -13,6 +13,7 @@ from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
 from osmium_chat.bot import Bot
+from osmium_chat.commands import CommandRestriction
 from osmium_chat.context import Context
 
 
@@ -30,20 +31,16 @@ async def on_connect() -> None:
     logger.info("Bot connected")
 
 
-@bot.command("newcategory")
+@bot.command("newcategory", restriction=CommandRestriction.COMMUNITY_ONLY)
 async def newcategory(ctx: Context, *, name: str) -> None:
-    if ctx.community is None:
-        await ctx.reply("Run this in a community channel.")
-        return
+    assert ctx.community is not None
     category = await ctx.community.create_category(name)
     await ctx.reply(f"Created category \"{category.name}\" (id {category.id}).")
 
 
-@bot.command("newchannel")
+@bot.command("newchannel", restriction=CommandRestriction.COMMUNITY_ONLY)
 async def newchannel(ctx: Context, category_name: str, *, channel_name: str) -> None:
-    if ctx.community is None:
-        await ctx.reply("Run this in a community channel.")
-        return
+    assert ctx.community is not None
     await ctx.community.fetch_channels()
     parent = next(
         (c for c in ctx.community.categories if c.name == category_name), None
@@ -55,11 +52,9 @@ async def newchannel(ctx: Context, category_name: str, *, channel_name: str) -> 
     await ctx.reply(f"Created #{channel.name} (id {channel.id}) under \"{parent.name}\".")
 
 
-@bot.command("categories")
+@bot.command("categories", restriction=CommandRestriction.COMMUNITY_ONLY)
 async def categories(ctx: Context) -> None:
-    if ctx.community is None:
-        await ctx.reply("Run this in a community channel.")
-        return
+    assert ctx.community is not None
     await ctx.community.fetch_channels()
     cats = ctx.community.categories
     if not cats:
@@ -75,11 +70,9 @@ async def categories(ctx: Context) -> None:
     await ctx.reply("\n".join(lines))
 
 
-@bot.command("deletecategory")
+@bot.command("deletecategory", restriction=CommandRestriction.COMMUNITY_ONLY)
 async def deletecategory(ctx: Context, *, name: str) -> None:
-    if ctx.community is None:
-        await ctx.reply("Run this in a community channel.")
-        return
+    assert ctx.community is not None
     await ctx.community.fetch_channels()
     target = next((c for c in ctx.community.categories if c.name == name), None)
     if target is None:
@@ -91,11 +84,9 @@ async def deletecategory(ctx: Context, *, name: str) -> None:
     await ctx.reply(f"Deleted \"{name}\" and {len(target.channels)} child channel(s).")
 
 
-@bot.command("movechannel")
+@bot.command("movechannel", restriction=CommandRestriction.COMMUNITY_ONLY)
 async def movechannel(ctx: Context, channel_name: str, *, category_name: str) -> None:
-    if ctx.community is None:
-        await ctx.reply("Run this in a community channel.")
-        return
+    assert ctx.community is not None
     await ctx.community.fetch_channels()
     target_channel = next(
         (c for c in ctx.community.channels if c.name == channel_name), None

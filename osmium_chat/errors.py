@@ -1,11 +1,16 @@
 """Exceptions raised while parsing and invoking commands."""
 
+from __future__ import annotations
+
+from typing import Any
+
 
 __all__: tuple[str, ...] = (
     "OsmiumChatError",
     "RequestError",
     "CommandError",
     "CommandNotFound",
+    "CommandRestrictionError",
     "ArgumentError",
     "MissingRequiredArgument",
     "BadArgument",
@@ -44,6 +49,18 @@ class CommandNotFound(CommandError):
         """:param name: The name the user tried to invoke."""
         self.name = name
         super().__init__(f"Command {name!r} is not registered")
+
+
+class CommandRestrictionError(CommandError):
+    """A command was invoked in a context it does not allow."""
+
+    def __init__(self, name: str, restriction: "Any") -> None:
+        """:param name: The command that was invoked.
+        :param restriction: The :class:`~osmium_chat.commands.CommandRestriction` that was violated.
+        """
+        self.name = name
+        self.restriction = restriction
+        super().__init__(f"Command {name!r} cannot be used here (restriction: {restriction.value})")
 
 
 class ArgumentError(CommandError):

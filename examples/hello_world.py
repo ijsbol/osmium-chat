@@ -11,6 +11,7 @@ from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
 from osmium_chat.bot import Bot
+from osmium_chat.commands import CommandRestriction
 from osmium_chat.context import Context
 
 
@@ -48,6 +49,16 @@ async def on_dm_message(ctx: Context) -> None:
 @bot.command("say")
 async def say(ctx: Context, *, words: str | None = None) -> None:
     await ctx.channel.send(words or "You didn't say anything!")
+
+
+@bot.command("dm", restriction=CommandRestriction.DM_ONLY)
+async def dm(ctx: Context) -> None:
+    await ctx.channel.send("This command only works in DMs!")
+
+
+@bot.command("community", restriction=CommandRestriction.COMMUNITY_ONLY)
+async def community(ctx: Context) -> None:
+    await ctx.channel.send("This command only works in community channels!")
 
 
 if __name__ == "__main__":
