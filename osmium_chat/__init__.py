@@ -1,22 +1,6 @@
-import tomllib
-from pathlib import Path
+from importlib.metadata import version
 
-
-def _get_version() -> str:
-    """Read the package version from the project's ``pyproject.toml``.
-
-    Supports both PEP 621 (``[project]``) and Poetry (``[tool.poetry]``) layouts.
-    """
-    pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
-    with pyproject.open("rb") as f:
-        data = tomllib.load(f)
-    project = data.get("project")
-    if project is not None and "version" in project:
-        return project["version"]
-    return data["tool"]["poetry"]["version"]
-
-
-__version__: str = _get_version()
+__version__: str = version("osmium-chat")
 
 
 # Imported after ``__version__`` is defined, since the submodules read it at
