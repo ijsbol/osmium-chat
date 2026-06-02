@@ -17,7 +17,9 @@ from osmium_chat.reaction import Reaction
 from osmium_chat.user.user import User
 
 if TYPE_CHECKING:
+    from osmium_chat.channel import Channel
     from osmium_chat.client import Client
+    from osmium_chat.community import Community
     from osmium_chat.emoji import CustomEmoji
 
 
@@ -53,6 +55,8 @@ class Message:
         "reply_to",
         "attachments",
         "reactions",
+        "channel",
+        "community",
         "_client",
     )
 
@@ -62,6 +66,8 @@ class Message:
         client: "Client",
         *,
         author: User | None = None,
+        channel: "Channel | None" = None,
+        community: "Community | None" = None,
     ) -> None:
         """Build a message from a protobuf payload.
 
@@ -70,6 +76,9 @@ class Message:
             the message.
         :param author: The resolved :class:`~osmium_chat.user.user.User` who sent
             the message, if the gateway supplied one.
+        :param channel: The channel the message was sent in, if known.
+        :param community: The community the message was sent in, or ``None``
+            for DMs. Only :attr:`~Community.id` is guaranteed to be meaningful.
         """
         self.id: int = message.message_id
         self.content_raw: Content = parse_content(message.message, list(message.entities))
@@ -84,6 +93,8 @@ class Message:
             if media.file is not None and media.file.file is not None
         ]
         self.reactions: list[Reaction] = []
+        self.channel: "Channel | None" = channel
+        self.community: "Community | None" = community
         self._client = client
 
     async def edit(self, content: "str | Content") -> "Message":

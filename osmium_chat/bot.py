@@ -227,7 +227,6 @@ class Bot:
             return
 
         author = User(update.author, self._client) if update.author else None
-        message = Message(update.message, self._client, author=author)
         chat_ref = update.message.chat_ref
         channel_ref = chat_ref.channel
         channel = Channel(
@@ -240,6 +239,13 @@ class Bot:
             Community.from_id(channel_ref.community_id, self._client)
             if channel_ref is not None
             else None
+        )
+        message = Message(
+            update.message,
+            self._client,
+            author=author,
+            channel=channel,
+            community=community,
         )
         ctx = Context(
             bot=self,
