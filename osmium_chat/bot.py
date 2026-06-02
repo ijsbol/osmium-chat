@@ -215,7 +215,7 @@ class Bot:
         if self.user is not None and message.author_id == self.user.id:
             return
 
-        content = message.content
+        content = str(message.content_raw)
         if not content.startswith(self.prefix):
             return
 

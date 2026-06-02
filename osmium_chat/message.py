@@ -8,6 +8,7 @@ from osmium_protos import (
     PB_SendMessage,
 )
 
+from osmium_chat.content import Content, parse_content
 from osmium_chat.user.user import User
 
 if TYPE_CHECKING:
@@ -30,6 +31,7 @@ class Message:
     __slots__: tuple[str, ...] = (
         "id",
         "content",
+        "content_raw",
         "author_id",
         "author",
         "chat_ref",
@@ -52,6 +54,7 @@ class Message:
             the message, if the gateway supplied one.
         """
         self.id: int = message.message_id
+        self.content_raw: Content = parse_content(message.message, list(message.entities))
         self.content: str = message.message
         self.author_id: int = message.author_id
         self.author: User | None = author
@@ -59,25 +62,29 @@ class Message:
         self.reply_to: int | None = message.reply_to
         self._client = client
 
-    async def edit(self, content: str) -> "Message":
+    async def edit(self, content: "str | Content") -> "Message":
         """Edit this message's text content.
 
         Waits for the gateway to confirm the edit and updates
-        :attr:`content` to match.
+        :attr:`content` and :attr:`content_raw` to match.
 
-        :param content: The new message text.
+        :param content: The new message text, either a plain string or a
+            :class:`~osmium_chat.content.Content` object.
         :returns: This message, with its content updated.
         :raises ValueError: If the message has no chat ref to route the edit to.
         :raises RequestError: If the gateway rejects the edit.
         """
         if self.chat_ref is None:
             raise ValueError("Cannot edit a message without a chat ref")
+        new_raw = content if isinstance(content, Content) else Content(content)
         await self._client.request(PB_EditMessage(
             chat_ref=self.chat_ref,
             message_id=self.id,
-            message=content,
+            message=new_raw.text,
+            entities=new_raw.entities,
         ))
-        self.content = content
+        self.content_raw = new_raw
+        self.content = new_raw.text
         return self
 
     async def delete(self) -> None:
@@ -92,22 +99,25 @@ class Message:
             message_ids=[self.id],
         ))
 
-    async def reply(self, content: str) -> "Message":
+    async def reply(self, content: "str | Content") -> "Message":
         """Send a message to this message's conversation, threaded as a reply.
 
         Waits for the gateway to acknowledge the send so the returned message
         carries the server-assigned id.
 
-        :param content: The reply text to send.
+        :param content: The reply text, either a plain string or a
+            :class:`~osmium_chat.content.Content` object.
         :returns: The newly created reply message.
         :raises ValueError: If the message has no chat ref to reply into.
         :raises RequestError: If the gateway rejects the send.
         """
         if self.chat_ref is None:
             raise ValueError("Cannot reply to a message without a chat ref")
+        content_obj = content if isinstance(content, Content) else Content(content)
         result = await self._client.request(PB_SendMessage(
             chat_ref=self.chat_ref,
-            message=content,
+            message=content_obj.text,
+            entities=content_obj.entities,
             reply_to=self.id,
         ))
         author = self._client.bot.user
@@ -117,7 +127,8 @@ class Message:
                 chat_ref=self.chat_ref,
                 message_id=sent.message_id if sent is not None else 0,
                 author_id=author.id if author is not None else 0,
-                message=content,
+                message=content_obj.text,
+                entities=content_obj.entities,
                 reply_to=self.id,
             ),
             self._client,

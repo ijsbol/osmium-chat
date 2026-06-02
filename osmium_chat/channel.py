@@ -1,6 +1,8 @@
 from enum import IntEnum
 from typing import TYPE_CHECKING
 
+from osmium_chat.content import Content
+
 from osmium_protos import (
     PB_Channel,
     PB_ChannelRef,
@@ -129,24 +131,27 @@ class Channel:
             raise TypeError("Only community channels can be edited or deleted")
         return ref
 
-    async def send(self, content: str, *, reply_to: int | None = None) -> "Message":
-        """Send a text message to this channel and return the created message.
+    async def send(self, content: "str | Content", *, reply_to: int | None = None) -> "Message":
+        """Send a message to this channel and return the created message.
 
         Waits for the gateway to acknowledge the send so the returned
         :class:`~osmium_chat.message.Message` carries the server-assigned id,
         ready to :meth:`~osmium_chat.message.Message.edit` or
         :meth:`~osmium_chat.message.Message.delete`.
 
-        :param content: The message text to send.
+        :param content: The message text, either a plain string or a
+            :class:`~osmium_chat.content.Content` object.
         :param reply_to: Optional id of a message this should reply to.
         :returns: The newly created message.
         """
         # Imported lazily to avoid a circular import (message -> user -> channel).
         from osmium_chat.message import Message
 
+        content_obj = content if isinstance(content, Content) else Content(content)
         result = await self._client.request(PB_SendMessage(
             chat_ref=self._chat_ref,
-            message=content,
+            message=content_obj.text,
+            entities=content_obj.entities,
             reply_to=reply_to,
         ))
         author = self._client.bot.user
@@ -156,7 +161,8 @@ class Channel:
                 chat_ref=self._chat_ref,
                 message_id=sent.message_id if sent is not None else 0,
                 author_id=author.id if author is not None else 0,
-                message=content,
+                message=content_obj.text,
+                entities=content_obj.entities,
                 reply_to=reply_to,
             ),
             self._client,

@@ -3,6 +3,7 @@ from osmium_chat.bot import Bot
 from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
+from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Strikethrough, Underline
 from osmium_chat.context import Context
 
 
@@ -47,6 +48,18 @@ async def on_dm_message(ctx: Context) -> None:
 async def say(ctx: Context, *, words: str | None = None) -> None:
     words = words or "You didn't say anything!"
     await ctx.channel.send(words)
+
+
+@bot.command("markdowntest")
+async def markdowntest(ctx: Context) -> None:
+    await ctx.channel.send(Content(
+        "Hello", Bold("world"), Italic("italic"),
+        Code("code"),
+        CodeBlock("code block"),
+        Strikethrough("strikethrough"),
+        Underline("underline"),
+        Underline(Bold(Italic(f"combined {Strikethrough('formatting')}"))),
+    ))
 
 
 @bot.command("sum")
