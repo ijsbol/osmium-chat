@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 from osmium_chat.channel import Channel
 from osmium_chat.community import Community
 from osmium_chat.content import Content
+from osmium_chat.member import Member
 from osmium_chat.message import Message
 from osmium_chat.user.user import User
 
@@ -42,7 +43,7 @@ class Context:
         *,
         bot: "Bot",
         message: Message,
-        author: User | None,
+        author: "Member | User | None",
         channel: Channel,
         community: Community | None = None,
         prefix: str,
@@ -54,7 +55,10 @@ class Context:
 
         :param bot: The bot handling the message.
         :param message: The message that triggered the command.
-        :param author: The user who sent the message, if known.
+        :param author: The author who sent the message — a
+            :class:`~osmium_chat.member.Member` for community messages, a
+            :class:`~osmium_chat.user.user.User` for DMs, or ``None`` if
+            not supplied by the gateway.
         :param channel: The channel the message was sent in.
         :param community: The community the message was sent in, or ``None`` for
             DMs and group chats. Only :attr:`~Community.id` is guaranteed to be
@@ -67,7 +71,7 @@ class Context:
         """
         self.bot = bot
         self.message = message
-        self.author = author
+        self.author: Member | User | None = author
         self.channel = channel
         self.community = community
         self.prefix = prefix

@@ -23,12 +23,14 @@ registered by inserting into :data:`CONVERTERS`.
 
 These types are resolved from message entities and community data:
 
-- :class:`~osmium_chat.user.user.User` — from a ``user_mention`` entity or
-  ``@username``/``@<id>`` text.
-- :class:`~osmium_chat.role.Role` — from ``&<name-or-id>`` text.
-- :class:`~osmium_chat.channel.Channel` — from ``#<name-or-id>`` text.
-- :class:`~osmium_chat.category.Category` — from ``#<name-or-id>`` text
-  (resolved against categories).
+- :class:`~osmium_chat.user.user.User` — from a ``user_mention`` entity,
+  ``@username``/``@<id>`` text, or a bare username/id.
+- :class:`~osmium_chat.role.Role` — from ``&<name-or-id>`` text or a bare
+  name/id.
+- :class:`~osmium_chat.channel.Channel` — from ``#<name-or-id>`` text or a
+  bare name/id.
+- :class:`~osmium_chat.category.Category` — from ``#<name-or-id>`` text or a
+  bare name/id (resolved against categories).
 - :class:`~osmium_chat.emoji.CustomEmoji` — from a ``custom_emoji`` entity or
   ``:name:`` text.
 
@@ -96,6 +98,7 @@ from osmium_chat.channel import Channel
 from osmium_chat.content import UnicodeEmoji, _utf16_len
 from osmium_chat.emoji import CustomEmoji
 from osmium_chat.errors import BadArgument, MissingRequiredArgument, TooManyArguments
+from osmium_chat.member import Member
 from osmium_chat.role import Role
 from osmium_chat.user.user import User
 
@@ -233,29 +236,63 @@ CONVERTERS: dict[type, Callable[[str], Any]] = {
 }
 
 
+def _author_user(ctx: "Context") -> "User | None":
+    return ctx.author
+
+
 async def _resolve_user(ctx: "Context", value: str, *_: Any) -> User:
     # Strip a leading @ to get either a numeric id or a username.
     from osmium_protos import PB_LookupUsername, PB_User
     raw = value.lstrip("@")
+    author_user = _author_user(ctx)
     if raw.isdigit():
         user_id = int(raw)
-        if ctx.author is not None and ctx.author.id == user_id:
-            return ctx.author
+        if author_user is not None and author_user.id == user_id:
+            return author_user
         return User(PB_User(id=user_id), ctx.bot._client)
     # Username mention — look up via the gateway.
-    if ctx.author is not None and ctx.author.username == raw:
-        return ctx.author
+    if author_user is not None and author_user.username == raw:
+        return author_user
     result = await ctx.bot._client.request(PB_LookupUsername(username=raw))
     if result.user_details is None or result.user_details.user is None:
         raise ValueError(value)
     return User(result.user_details.user, ctx.bot._client)
 
 
+async def _resolve_member(ctx: "Context", value: str, *_: Any) -> Member:
+    from osmium_protos import PB_GetMembers, PB_LookupUsername, PB_User
+    if ctx.community is None:
+        raise ValueError(value)
+    raw = value.lstrip("@")
+    author_user = _author_user(ctx)
+    if raw.isdigit():
+        user_id = int(raw)
+    else:
+        if author_user is not None and author_user.username == raw:
+            user_id = author_user.id
+        else:
+            result = await ctx.bot._client.request(PB_LookupUsername(username=raw))
+            if result.user_details is None or result.user_details.user is None:
+                raise ValueError(value)
+            user_id = result.user_details.user.id
+    result = await ctx.bot._client.request(
+        PB_GetMembers(community_id=ctx.community.id, member_ids=[user_id])
+    )
+    members_pb = result.members
+    if members_pb is None or not members_pb.members:
+        raise ValueError(value)
+    member_pb = next((m for m in members_pb.members if m.id == user_id), None)
+    if member_pb is None:
+        raise ValueError(value)
+    user_pb = next((u for u in members_pb.users if u.id == user_id), None)
+    if user_pb is None:
+        user_pb = PB_User(id=user_id)
+    return Member(member_pb, user_pb, ctx.bot._client, community=ctx.community)
+
+
 async def _resolve_role(ctx: "Context", value: str, *_: Any) -> Role:
     m = _ROLE_MENTION_RE.match(value)
-    if not m:
-        raise ValueError(value)
-    key = m.group(1)
+    key = m.group(1) if m else value
     if ctx.community is None:
         raise ValueError(value)
     roles = ctx.community.roles if ctx.community.roles else await ctx.community.fetch_roles()
@@ -277,9 +314,7 @@ async def _resolve_role(ctx: "Context", value: str, *_: Any) -> Role:
 
 async def _resolve_channel(ctx: "Context", value: str, *_: Any) -> Channel:
     m = _CHANNEL_MENTION_RE.match(value)
-    if not m:
-        raise ValueError(value)
-    key = m.group(1)
+    key = m.group(1) if m else value
     if ctx.community is None:
         raise ValueError(value)
     channels = ctx.community.channels if ctx.community.channels else await ctx.community.fetch_channels()
@@ -301,9 +336,7 @@ async def _resolve_channel(ctx: "Context", value: str, *_: Any) -> Channel:
 
 async def _resolve_category(ctx: "Context", value: str, *_: Any) -> Category:
     m = _CHANNEL_MENTION_RE.match(value)
-    if not m:
-        raise ValueError(value)
-    key = m.group(1)
+    key = m.group(1) if m else value
     if ctx.community is None:
         raise ValueError(value)
     if not ctx.community.categories:
@@ -371,7 +404,7 @@ def _entity_matches(entity: Any, annotation: type) -> bool:
         return False
     if annotation is CustomEmoji:
         return entity.custom_emoji is not None
-    if annotation is User:
+    if annotation is User or annotation is Member:
         return entity.user_mention is not None or entity.username is not None
     return False
 
@@ -382,6 +415,7 @@ def _entity_matches(entity: Any, annotation: type) -> bool:
 # at the argument's position in the message, or None if there is no entity there.
 CONTEXT_CONVERTERS: dict[type, Callable[..., Awaitable[Any]]] = {
     User: _resolve_user,
+    Member: _resolve_member,
     Role: _resolve_role,
     Channel: _resolve_channel,
     Category: _resolve_category,

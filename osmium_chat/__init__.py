@@ -13,6 +13,7 @@ from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Spoiler,
 from osmium_chat.emoji import CustomEmoji
 from osmium_chat.file import File
 from osmium_chat.invite import Invite
+from osmium_chat.member import Member
 from osmium_chat.context import Context
 from osmium_chat.mentions import UserMention
 from osmium_chat.message import Message
@@ -41,6 +42,7 @@ __all__: tuple[str, ...] = (
     "File",
     "Invite",
     "Italic",
+    "Member",
     "Message",
     "Photo",
     "Reaction",

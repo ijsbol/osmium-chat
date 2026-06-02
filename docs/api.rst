@@ -61,6 +61,11 @@ Invites
 
 .. automodule:: osmium_chat.invite
 
+Members
+-------
+
+.. automodule:: osmium_chat.member
+
 Roles
 -----
 

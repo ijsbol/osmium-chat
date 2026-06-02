@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from osmium_chat.invite import InvitePreview
 
-from osmium_protos import PB_LookupInvite, PB_UpdateMessageCreated, PB_UseInvite
+from osmium_protos import PB_CommunityMember, PB_LookupInvite, PB_UpdateMessageCreated, PB_UseInvite
 
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
@@ -14,6 +14,7 @@ from osmium_chat.community import Community
 from osmium_chat.commands import Command, Commands, CommandRestriction, StringView
 from osmium_chat.context import Context
 from osmium_chat.errors import CommandError, CommandNotFound, CommandRestrictionError
+from osmium_chat.member import Member
 from osmium_chat.message import Message
 from osmium_chat.user.user import User
 
@@ -233,10 +234,17 @@ class Bot:
             if channel_ref is not None
             else None
         )
-        author = (
-            User(update.author, self._client, community=community)
-            if update.author else None
-        )
+        if update.author and community is not None:
+            author: Member | User | None = Member(
+                PB_CommunityMember(id=update.author.id, community_id=community.id),
+                update.author,
+                self._client,
+                community=community,
+            )
+        elif update.author:
+            author = User(update.author, self._client)
+        else:
+            author = None
         channel = Channel(
             chat_ref,
             self._client,

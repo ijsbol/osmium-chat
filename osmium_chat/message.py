@@ -13,6 +13,7 @@ from osmium_protos import (
 
 from osmium_chat.content import Content, UnicodeEmoji, parse_content
 from osmium_chat.file import File
+from osmium_chat.member import Member
 from osmium_chat.reaction import Reaction
 from osmium_chat.user.user import User
 
@@ -65,7 +66,7 @@ class Message:
         message: PB_Message,
         client: "Client",
         *,
-        author: User | None = None,
+        author: "Member | User | None" = None,
         channel: "Channel | None" = None,
         community: "Community | None" = None,
     ) -> None:
@@ -74,8 +75,11 @@ class Message:
         :param message: The raw ``PB_Message`` to read fields from.
         :param client: The client used to edit, delete, reply, and react to
             the message.
-        :param author: The resolved :class:`~osmium_chat.user.user.User` who sent
-            the message, if the gateway supplied one.
+        :param author: The resolved author who sent the message. A
+            :class:`~osmium_chat.member.Member` for community messages (when
+            the gateway supplied user data), a
+            :class:`~osmium_chat.user.user.User` for DMs, or ``None`` if the
+            gateway did not include author information.
         :param channel: The channel the message was sent in, if known.
         :param community: The community the message was sent in, or ``None``
             for DMs. Only :attr:`~Community.id` is guaranteed to be meaningful.
@@ -84,7 +88,7 @@ class Message:
         self.content_raw: Content = parse_content(message.message, list(message.entities))
         self.content: str = message.message
         self.author_id: int = message.author_id
-        self.author: User | None = author
+        self.author: Member | User | None = author
         self.chat_ref: PB_ChatRef | None = message.chat_ref
         self.reply_to: int | None = message.reply_to
         self.attachments: list[File] = [
