@@ -26,6 +26,7 @@ from osmium_chat.channel import Channel, ChannelType
 from osmium_chat.commands import Command
 from osmium_chat.community import Community
 from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Spoiler, Strikethrough, TextUrl, Underline
+from osmium_chat.invite import Invite
 from osmium_chat.context import Context
 from osmium_chat.message import Message
 from osmium_chat.permissions import CommunityPermission
@@ -46,6 +47,7 @@ __all__: tuple[str, ...] = (
     "CommunityPermission",
     "Content",
     "Context",
+    "Invite",
     "Italic",
     "Message",
     "Photo",

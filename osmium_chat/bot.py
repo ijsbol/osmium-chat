@@ -1,9 +1,12 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from logging import Logger
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from osmium_protos import PB_UpdateMessageCreated, PB_UseInvite
+if TYPE_CHECKING:
+    from osmium_chat.invite import InvitePreview
+
+from osmium_protos import PB_LookupInvite, PB_UpdateMessageCreated, PB_UseInvite
 
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
@@ -146,6 +149,21 @@ class Bot:
             self.add_command(command)
             return command
         return decorator
+
+    async def lookup_invite(self, code: str) -> "InvitePreview":
+        """Fetch an invite by code and return its full metadata.
+
+        :param code: The invite code to resolve.
+        :returns: The :class:`~osmium_chat.invite.InvitePreview` for the invite.
+        :raises RequestError: If the gateway cannot find the invite.
+        """
+        from osmium_chat.invite import InvitePreview
+
+        result = await self._client.request(PB_LookupInvite(code=code))
+        preview = result.invite_preview
+        if preview is None:
+            raise RuntimeError("Gateway did not return an invite preview")
+        return InvitePreview(preview, self._client)
 
     def add_command(self, command: Command) -> None:
         """Register a command under its name and every alias.

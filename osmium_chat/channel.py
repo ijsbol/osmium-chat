@@ -7,14 +7,19 @@ from osmium_protos import (
     PB_Channel,
     PB_ChannelRef,
     PB_ChatRef,
+    PB_CreateChatInvite,
     PB_DeleteChannel,
     PB_EditChannel,
+    PB_ListChatInvites,
+    PB_LookupInvite,
     PB_Message,
     PB_SendMessage,
 )
 
 if TYPE_CHECKING:
+    from osmium_chat.category import Category
     from osmium_chat.client import Client
+    from osmium_chat.invite import InvitePreview
     from osmium_chat.message import Message
 
 
@@ -60,6 +65,7 @@ class Channel:
         "community_id",
         "position",
         "parent_id",
+        "category",
     )
 
     def __init__(
@@ -93,6 +99,7 @@ class Channel:
         self.community_id = community_id
         self.position = position
         self.parent_id = parent_id
+        self.category: "Category | None" = None
 
     @classmethod
     def from_pb(cls, channel: PB_Channel, client: "Client") -> "Channel":
@@ -213,3 +220,51 @@ class Channel:
         :raises TypeError: If this channel is not a community channel.
         """
         await self._client.send_pb(PB_DeleteChannel(channel=self._channel_ref))
+
+    async def create_invite(
+        self,
+        *,
+        expires_at: int | None = None,
+        max_uses: int | None = None,
+    ) -> "InvitePreview":
+        """Create an invite link for this channel and return the full preview.
+
+        Creates the invite then immediately fetches its metadata so the returned
+        :class:`~osmium_chat.invite.InvitePreview` carries creator and target info.
+
+        :param expires_at: Optional Unix timestamp (seconds) at which the invite expires.
+        :param max_uses: Optional maximum number of times the invite can be used.
+        :returns: The newly created invite with full metadata.
+        :raises RequestError: If the gateway rejects the request.
+        """
+        from osmium_chat.invite import InvitePreview
+
+        result = await self._client.request(PB_CreateChatInvite(
+            chat_ref=self._chat_ref,
+            expires_at=expires_at,
+            max_uses=max_uses,
+        ))
+        created = result.created_invite
+        if created is None:
+            raise RuntimeError("Gateway did not return a created invite")
+        preview_result = await self._client.request(PB_LookupInvite(code=created.code))
+        preview = preview_result.invite_preview
+        if preview is None:
+            raise RuntimeError("Gateway did not return an invite preview")
+        return InvitePreview(preview, self._client)
+
+    async def get_invites(self) -> "list[InvitePreview]":
+        """Fetch all active invite links for this channel.
+
+        :returns: The channel's active invites with full metadata.
+        :raises RequestError: If the gateway rejects the request.
+        """
+        from osmium_chat.invite import InvitePreview
+
+        result = await self._client.request(
+            PB_ListChatInvites(chat_ref=self._chat_ref)
+        )
+        invite_list = result.invite_list
+        if invite_list is None:
+            return []
+        return [InvitePreview(inv, self._client) for inv in invite_list.invites]

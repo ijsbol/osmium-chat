@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from osmium_protos import (
+    PB_ChannelType,
     PB_Community,
     PB_CreateChannel,
     PB_CreateRole,
@@ -10,6 +11,7 @@ from osmium_protos import (
     PB_GetRoles,
 )
 
+from osmium_chat.category import Category
 from osmium_chat.channel import Channel, ChannelType
 from osmium_chat.errors import OsmiumChatError
 from osmium_chat.permissions import CommunityPermission
@@ -19,6 +21,43 @@ from osmium_chat.utils import locate_created
 
 if TYPE_CHECKING:
     from osmium_chat.client import Client
+
+
+def _build_channels(
+    pb_channels: list, client: "Client"
+) -> "tuple[list[Channel], list[Category]]":
+    """Build the channel and category lists from raw protobuf payloads.
+
+    Returns a flat list of all non-category :class:`~osmium_chat.channel.Channel`
+    objects and a separate list of :class:`~osmium_chat.category.Category` objects.
+    Each channel that belongs to a category has its
+    :attr:`~osmium_chat.channel.Channel.category` back-reference set.
+    """
+    category_ids: set[int] = {
+        c.id for c in pb_channels if int(c.type) == ChannelType.CATEGORY
+    }
+
+    channel_map: dict[int, Channel] = {
+        c.id: Channel.from_pb(c, client)
+        for c in pb_channels
+        if c.id not in category_ids
+    }
+
+    categories: list[Category] = []
+    for c in pb_channels:
+        if c.id not in category_ids:
+            continue
+        child_channels = [
+            channel_map[ch.id]
+            for ch in pb_channels
+            if ch.parent_id == c.id and ch.id in channel_map
+        ]
+        category = Category.from_pb(c, client, channels=child_channels)
+        for ch in child_channels:
+            ch.category = category
+        categories.append(category)
+
+    return list(channel_map.values()), categories
 
 
 __all__: tuple[str, ...] = (
@@ -45,6 +84,7 @@ class Community:
         "permissions",
         "photo",
         "channels",
+        "categories",
         "roles",
         "_client",
     )
@@ -55,6 +95,7 @@ class Community:
         client: "Client",
         *,
         channels: list[Channel] | None = None,
+        categories: list[Category] | None = None,
         roles: list[Role] | None = None,
     ) -> None:
         """Build a community from a protobuf payload.
@@ -62,7 +103,8 @@ class Community:
         :param community: The raw ``PB_Community`` to read fields from.
         :param client: The client used to edit the community and manage channels
             and roles.
-        :param channels: The community's channels, if already known.
+        :param channels: The community's non-category channels, if already known.
+        :param categories: The community's categories, if already known.
         :param roles: The community's roles, if already known.
         """
         self.id: int = community.id
@@ -72,6 +114,7 @@ class Community:
         self.permissions: CommunityPermission = CommunityPermission(community.permissions)
         self.photo: Photo | None = Photo(community.photo) if community.photo else None
         self.channels: list[Channel] = channels if channels is not None else []
+        self.categories: list[Category] = categories if categories is not None else []
         self.roles: list[Role] = roles if roles is not None else []
         self._client = client
 
@@ -104,10 +147,14 @@ class Community:
         :param channels: Raw ``PB_Channel`` objects to wrap as :class:`~osmium_chat.channel.Channel`.
         :param roles: Raw ``PB_CommunityRole`` objects to wrap as :class:`~osmium_chat.role.Role`.
         """
+        built_channels, built_categories = (
+            _build_channels(channels, client) if channels else (None, None)
+        )
         return cls(
             community,
             client,
-            channels=[Channel.from_pb(c, client) for c in channels] if channels else None,
+            channels=built_channels,
+            categories=built_categories,
             roles=[Role(r, client) for r in roles] if roles else None,
         )
 
@@ -164,16 +211,45 @@ class Community:
         :raises OsmiumChatError: If the channel was created but cannot be located
             in the refetched channel list.
         """
-        before = {channel.id for channel in await self.fetch_channels()}
+        before = {c.id for c in (await self.fetch_channels())}
         await self._client.request(PB_CreateChannel(
             community_id=self.id,
             name=name,
-            type=type.value,
+            type=PB_ChannelType(type.value),
             parent_id=parent_id,
         ))
-        created = locate_created(before, await self.fetch_channels(), name)
+        await self.fetch_channels()
+        created = locate_created(before, self.channels, name)
         if created is None:
             raise OsmiumChatError(f"Created channel {name!r} could not be located")
+        return created
+
+    async def create_category(self, name: str) -> Category:
+        """Create a new category channel in this community and return it.
+
+        Snapshots existing channel ids, creates the category, refetches, and
+        returns the newly appeared :class:`~osmium_chat.category.Category` with
+        an empty :attr:`~osmium_chat.category.Category.channels` list (child
+        channels can be assigned by creating channels with the category's id as
+        ``parent_id``). :attr:`channels` is refreshed as a side effect.
+
+        :param name: The name of the new category.
+        :returns: The newly created category.
+        :raises RequestError: If the gateway rejects the request.
+        :raises OsmiumChatError: If the category was created but cannot be located
+            in the refetched channel list.
+        """
+        await self.fetch_channels()
+        before = {c.id for c in self.categories}
+        await self._client.request(PB_CreateChannel(
+            community_id=self.id,
+            name=name,
+            type=PB_ChannelType(ChannelType.CATEGORY.value),
+        ))
+        await self.fetch_channels()
+        created = locate_created(before, self.categories, name)
+        if created is None:
+            raise OsmiumChatError(f"Created category {name!r} could not be located")
         return created
 
     async def create_role(
@@ -228,11 +304,11 @@ class Community:
         :returns: The community's channels.
         """
         result = await self._client.request(PB_GetChannels(community_id=self.id))
-        channels = result.channels
-        self.channels = (
-            [Channel.from_pb(c, self._client) for c in channels.channels]
-            if channels is not None else []
-        )
+        pb = result.channels
+        if pb is not None:
+            self.channels, self.categories = _build_channels(pb.channels, self._client)
+        else:
+            self.channels, self.categories = [], []
         return self.channels
 
     async def fetch_roles(self) -> list[Role]:
