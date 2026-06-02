@@ -26,15 +26,30 @@ Channels
 
 .. automodule:: osmium_chat.channel
 
+Categories
+----------
+
+.. automodule:: osmium_chat.category
+
 Messages
 --------
 
 .. automodule:: osmium_chat.message
 
+Formatting
+----------
+
+.. automodule:: osmium_chat.content
+
 Communities
 -----------
 
 .. automodule:: osmium_chat.community
+
+Invites
+-------
+
+.. automodule:: osmium_chat.invite
 
 Roles
 -----

@@ -1,3 +1,5 @@
+"""Community roles controlling member permissions and display."""
+
 from typing import TYPE_CHECKING
 
 from osmium_protos import PB_CommunityRole, PB_DeleteRole, PB_EditRole

@@ -1,3 +1,5 @@
+"""Category channels that group other channels together."""
+
 from typing import TYPE_CHECKING
 
 from osmium_protos import PB_Channel

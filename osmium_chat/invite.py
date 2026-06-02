@@ -1,3 +1,5 @@
+"""Invite links for joining communities and channels."""
+
 from enum import IntEnum
 from typing import TYPE_CHECKING
 

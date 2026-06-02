@@ -1,3 +1,26 @@
+"""Rich text formatting for outbound messages.
+
+Formatting nodes — :class:`Bold`, :class:`Italic`, :class:`Underline`,
+:class:`Strikethrough`, :class:`Code`, :class:`CodeBlock`, :class:`Spoiler`,
+and :class:`TextUrl` — can be nested freely and embedded inside a
+:class:`Content` using either the constructor or f-string interpolation::
+
+    from osmium_chat.content import Bold, Content, Italic
+
+    # constructor form
+    msg = Content("Hello, ", Bold("world"), "!")
+
+    # f-string form — identical result
+    msg = Content(f"Hello, {Bold('world')}!")
+
+    # nesting
+    msg = Content(f"{Bold(Italic('important'))}")
+
+Each node tree is serialized to a flat text string plus a matching list of
+:class:`~osmium_protos.PB_MessageEntity` offset/length spans — the wire
+format the Osmium gateway expects.
+"""
+
 from osmium_protos import (
     PB_MessageEntity,
     PB_MessageEntityPreEntity,
@@ -75,6 +98,8 @@ class _FormattingNode:
 
 
 class Bold(_FormattingNode):
+    """Renders its contents in **bold**."""
+
     __slots__ = ()
 
     def _make_entity(self, start: int, length: int) -> PB_MessageEntity:
@@ -82,6 +107,8 @@ class Bold(_FormattingNode):
 
 
 class Italic(_FormattingNode):
+    """Renders its contents in *italic*."""
+
     __slots__ = ()
 
     def _make_entity(self, start: int, length: int) -> PB_MessageEntity:
@@ -89,6 +116,8 @@ class Italic(_FormattingNode):
 
 
 class Underline(_FormattingNode):
+    """Renders its contents with an underline."""
+
     __slots__ = ()
 
     def _make_entity(self, start: int, length: int) -> PB_MessageEntity:
@@ -96,6 +125,8 @@ class Underline(_FormattingNode):
 
 
 class Strikethrough(_FormattingNode):
+    """Renders its contents with a ~~strikethrough~~."""
+
     __slots__ = ()
 
     def _make_entity(self, start: int, length: int) -> PB_MessageEntity:
@@ -103,6 +134,8 @@ class Strikethrough(_FormattingNode):
 
 
 class Code(_FormattingNode):
+    """Renders its contents as inline ``code``."""
+
     __slots__ = ()
 
     def _make_entity(self, start: int, length: int) -> PB_MessageEntity:
@@ -110,6 +143,16 @@ class Code(_FormattingNode):
 
 
 class CodeBlock(_FormattingNode):
+    """Renders its contents as a fenced code block with optional syntax highlighting.
+
+    .. code-block:: python
+
+        CodeBlock("print('hello')", language="python")
+
+    :param parts: The text content of the block.
+    :param language: An optional language hint for syntax highlighting (e.g. ``"python"``).
+    """
+
     __slots__ = ("_language",)
 
     def __init__(self, *parts: "str | _FormattingNode", language: str = "") -> None:
@@ -129,6 +172,8 @@ class CodeBlock(_FormattingNode):
 
 
 class Spoiler(_FormattingNode):
+    """Hides its contents behind a spoiler that must be clicked to reveal."""
+
     __slots__ = ()
 
     def _make_entity(self, start: int, length: int) -> PB_MessageEntity:
@@ -140,6 +185,16 @@ class Spoiler(_FormattingNode):
 
 
 class TextUrl(_FormattingNode):
+    """Renders its contents as a hyperlink.
+
+    .. code-block:: python
+
+        TextUrl("osmium.chat", url="https://osmium.chat")
+
+    :param parts: The visible link text.
+    :param url: The URL the link points to.
+    """
+
     __slots__ = ("_url",)
 
     def __init__(self, *parts: "str | _FormattingNode", url: str) -> None:
@@ -158,6 +213,20 @@ class TextUrl(_FormattingNode):
 
 
 class Content:
+    """A complete message payload: plain text plus formatting entity spans.
+
+    Construct by passing any mix of :class:`str` and formatting nodes::
+
+        content = Content("Price: ", Bold("$9.99"), " — limited time!")
+
+    Or use f-string embedding::
+
+        content = Content(f"Price: {Bold('$9.99')} — limited time!")
+
+    The :attr:`text` property returns the plain-text string; :attr:`entities`
+    returns the matching ``PB_MessageEntity`` list ready for the wire.
+    """
+
     __slots__ = ("_parts", "_wire_entities")
 
     def __init__(self, *parts: "str | _FormattingNode") -> None:
