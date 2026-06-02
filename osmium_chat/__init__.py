@@ -7,7 +7,7 @@ __version__: str = version("osmium-chat")
 # import time.
 from osmium_chat.bot import Bot
 from osmium_chat.channel import Channel, ChannelType
-from osmium_chat.commands import Command, CommandRestriction
+from osmium_chat.commands import Command, CommandRestriction, Commands, command, dm_command, guild_command, listen
 from osmium_chat.community import Community
 from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Spoiler, Strikethrough, TextUrl, Underline, UnicodeEmoji
 from osmium_chat.emoji import CustomEmoji
@@ -32,6 +32,7 @@ __all__: tuple[str, ...] = (
     "CodeBlock",
     "Command",
     "CommandRestriction",
+    "Commands",
     "Community",
     "CommunityPermission",
     "Content",
@@ -51,4 +52,8 @@ __all__: tuple[str, ...] = (
     "UnicodeEmoji",
     "User",
     "UserMention",
+    "command",
+    "dm_command",
+    "guild_command",
+    "listen",
 )

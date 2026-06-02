@@ -10,8 +10,7 @@ Commands
 from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
-from osmium_chat.bot import Bot
-from osmium_chat.context import Context
+from osmium_chat import Bot, Context, commands
 
 
 logger = getLogger("osmium_chat")
@@ -23,32 +22,30 @@ logger.addHandler(_handler)
 bot = Bot(prefix="!", client_id=00000, logger=logger)
 
 
-@bot.on("connect")
-async def on_connect() -> None:
-    logger.info("Bot connected")
+class ChannelCommands(commands.Commands):
+    @commands.listen("connect")
+    async def on_connect(self) -> None:
+        logger.info("Bot connected")
+
+    @commands.guild_command("newchannel")
+    async def newchannel(self, ctx: Context, *, name: str = "general") -> None:
+        assert ctx.community is not None
+        channel = await ctx.community.create_channel(name=name)
+        await ctx.reply(f"Created #{channel.name} (id {channel.id}).")
+
+    @commands.command("rename")
+    async def rename(self, ctx: Context, *, name: str) -> None:
+        await ctx.channel.edit(name=name)
+        await ctx.reply(f"Renamed channel to #{name}.")
+
+    @commands.command("nukechannel")
+    async def nukechannel(self, ctx: Context) -> None:
+        name = ctx.channel.name or str(ctx.channel.id)
+        await ctx.channel.delete()
+        logger.info("Deleted channel #%s", name)
 
 
-@bot.command("newchannel")
-async def newchannel(ctx: Context, *, name: str = "general") -> None:
-    if ctx.community is None:
-        await ctx.reply("Run this in a community channel.")
-        return
-    channel = await ctx.community.create_channel(name=name)
-    await ctx.reply(f"Created #{channel.name} (id {channel.id}).")
-
-
-@bot.command("rename")
-async def rename(ctx: Context, *, name: str) -> None:
-    await ctx.channel.edit(name=name)
-    await ctx.reply(f"Renamed channel to #{name}.")
-
-
-@bot.command("nukechannel")
-async def nukechannel(ctx: Context) -> None:
-    name = ctx.channel.name or str(ctx.channel.id)
-    await ctx.channel.delete()
-    logger.info("Deleted channel #%s", name)
-
+bot.add_commands(ChannelCommands)
 
 if __name__ == "__main__":
     run(bot.connect(token="..."))

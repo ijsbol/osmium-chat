@@ -10,9 +10,7 @@ See the other examples for focused feature demos:
 from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
-from osmium_chat.bot import Bot
-from osmium_chat.commands import CommandRestriction
-from osmium_chat.context import Context
+from osmium_chat import Bot, Context, Message, commands
 
 
 logger = getLogger("osmium_chat")
@@ -24,42 +22,39 @@ logger.addHandler(_handler)
 bot = Bot(prefix="!", client_id=150896, logger=logger)
 
 
-@bot.on("connect")
-async def on_connect() -> None:
-    logger.info("Bot connected to WebSocket server")
-    # await bot.use_invite("your_invite_code_here")
+class HelloCommands(commands.Commands):
+    @commands.listen("connect")
+    async def on_connect(self) -> None:
+        logger.info("Bot connected to WebSocket server")
+        # await self.bot.use_invite("your_invite_code_here")
+
+    @commands.listen("message")
+    async def on_message(self, message: Message) -> None:
+        who = message.author.name if message.author else "someone"
+        logger.info("message from %s: %s", who, message.content)
+
+    @commands.listen("guild_message")
+    async def on_guild_message(self, message: Message) -> None:
+        logger.info("guild message: %s", message.content)
+
+    @commands.listen("dm_message")
+    async def on_dm_message(self, message: Message) -> None:
+        logger.info("dm message: %s", message.content)
+
+    @commands.command("say")
+    async def say(self, ctx: Context, *, words: str | None = None) -> None:
+        await ctx.channel.send(words or "You didn't say anything!")
+
+    @commands.dm_command("dm")
+    async def dm(self, ctx: Context) -> None:
+        await ctx.channel.send("This command only works in DMs!")
+
+    @commands.guild_command("community")
+    async def community(self, ctx: Context) -> None:
+        await ctx.channel.send("This command only works in community channels!")
 
 
-@bot.on("message")
-async def on_message(ctx: Context) -> None:
-    who = ctx.message.author.name if ctx.message.author else "someone"
-    logger.info("message from %s: %s", who, ctx.message.content)
-
-
-@bot.on("guild_message")
-async def on_guild_message(ctx: Context) -> None:
-    logger.info("guild message: %s", ctx.message.content)
-
-
-@bot.on("dm_message")
-async def on_dm_message(ctx: Context) -> None:
-    logger.info("dm message: %s", ctx.message.content)
-
-
-@bot.command("say")
-async def say(ctx: Context, *, words: str | None = None) -> None:
-    await ctx.channel.send(words or "You didn't say anything!")
-
-
-@bot.command("dm", restriction=CommandRestriction.DM_ONLY)
-async def dm(ctx: Context) -> None:
-    await ctx.channel.send("This command only works in DMs!")
-
-
-@bot.command("community", restriction=CommandRestriction.COMMUNITY_ONLY)
-async def community(ctx: Context) -> None:
-    await ctx.channel.send("This command only works in community channels!")
-
+bot.add_commands(HelloCommands)
 
 if __name__ == "__main__":
     run(bot.connect(token="..."))

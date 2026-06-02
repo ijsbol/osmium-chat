@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from logging import Logger
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from osmium_chat.invite import InvitePreview
@@ -11,7 +11,7 @@ from osmium_protos import PB_LookupInvite, PB_UpdateMessageCreated, PB_UseInvite
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
 from osmium_chat.community import Community
-from osmium_chat.commands import Command, CommandCallback, CommandRestriction, StringView
+from osmium_chat.commands import Command, Commands, CommandRestriction, StringView
 from osmium_chat.context import Context
 from osmium_chat.errors import CommandError, CommandNotFound, CommandRestrictionError
 from osmium_chat.message import Message
@@ -19,7 +19,6 @@ from osmium_chat.user.user import User
 
 
 EventHandler = Callable[..., Awaitable[None]]
-EH = TypeVar("EH", bound=EventHandler)
 
 
 class Bot:
@@ -28,34 +27,41 @@ class Bot:
     Holds connection state, the registered event listeners, and the
     authenticated :class:`~osmium_chat.user.user.User` once connected.
 
+    Commands and event listeners are defined by subclassing
+    :class:`~osmium_chat.commands.Commands` and registering the subclass with
+    :meth:`add_commands`.
+
     **Events**
 
-    Listeners are registered with :meth:`on` and receive the arguments the event
-    is dispatched with. The built-in events are:
+    The built-in events (used with
+    :func:`~osmium_chat.commands.listen`) are:
 
     - ``connect`` — fired with no arguments once the bot has authorized.
-    - ``message`` — fired with the :class:`~osmium_chat.context.Context` for
+    - ``message`` — fired with a :class:`~osmium_chat.message.Message` for
       *every* inbound message, regardless of where it came from.
-    - ``guild_message`` — fired with the context when the message was sent in a
-      community (guild) channel.
-    - ``dm_message`` — fired with the context when the message was a direct
-      message to the bot.
+    - ``guild_message`` — fired with a :class:`~osmium_chat.message.Message`
+      when the message was sent in a community (guild) channel.
+    - ``dm_message`` — fired with a :class:`~osmium_chat.message.Message`
+      when the message was a direct message to the bot.
     - ``command_error`` — fired with ``(ctx, error)`` when a command lookup or
       invocation fails.
 
     .. code-block:: python
 
-        @bot.on("message")
-        async def on_message(ctx: Context) -> None:
-            ...
+        from osmium_chat import Bot, Context, Message, commands
 
-        @bot.on("guild_message")
-        async def on_guild_message(ctx: Context) -> None:
-            ...
+        class MyCommands(commands.Commands):
+            @commands.listen("message")
+            async def on_message(self, message: Message) -> None:
+                ...
 
-        @bot.on("dm_message")
-        async def on_dm_message(ctx: Context) -> None:
-            ...
+            @commands.command("ping")
+            async def ping(self, ctx: Context) -> None:
+                await ctx.channel.send("pong")
+
+        bot = Bot(prefix="!", client_id=12345)
+        bot.add_commands(MyCommands)
+        bot.run(token="...")
     """
 
     __slots__: tuple[str, ...] = (
@@ -91,24 +97,6 @@ class Bot:
         self._commands: dict[str, Command] = {}
         self.user: User | None = None
 
-    def on(self, event: str) -> Callable[[EH], EH]:
-        """Register a coroutine as a listener for the given event.
-
-        This is the generic primitive every ``on_*`` decorator is built on,
-        so new events only need a thin wrapper here plus a ``dispatch`` call
-        from wherever the event originates.
-
-        .. code-block:: python
-
-            @bot.on("connect")
-            async def handler() -> None:
-                ...
-        """
-        def decorator(func: EH) -> EH:
-            self._listeners.setdefault(event, []).append(func)
-            return func
-        return decorator
-
     async def dispatch(self, event: str, *args: Any, **kwargs: Any) -> None:
         """Invoke every listener registered for ``event``.
 
@@ -120,38 +108,6 @@ class Bot:
                 await handler(*args, **kwargs)
             except Exception:
                 self._logger.exception("Error in '%s' event handler", event)
-
-    def command(
-        self,
-        name: str | None = None,
-        *,
-        aliases: tuple[str, ...] = (),
-        restriction: CommandRestriction = CommandRestriction.NONE,
-    ) -> Callable[[CommandCallback], Command]:
-        """Register a coroutine as a command.
-
-        The decorated coroutine receives a :class:`~osmium_chat.context.Context`
-        as its first argument; every parameter after that is parsed from the
-        message text and converted to its annotated type. Parameters with a
-        default become optional, a keyword-only parameter (after ``*``) consumes
-        the rest of the message, and ``*args`` collects all remaining tokens.
-
-        .. code-block:: python
-
-            @bot.command("say", restriction=CommandRestriction.DM_ONLY)
-            async def say(ctx: Context, *, words: str = "...") -> None:
-                await ctx.channel.send(words)
-
-        :param name: The command name; defaults to the function name.
-        :param aliases: Additional names the command also responds to.
-        :param restriction: Where the command may be invoked; defaults to
-            :attr:`~osmium_chat.commands.CommandRestriction.NONE`.
-        """
-        def decorator(func: CommandCallback) -> Command:
-            command = Command(func, name=name, aliases=aliases, restriction=restriction)
-            self.add_command(command)
-            return command
-        return decorator
 
     async def lookup_invite(self, code: str) -> "InvitePreview":
         """Fetch an invite by code and return its full metadata.
@@ -168,16 +124,66 @@ class Bot:
             raise RuntimeError("Gateway did not return an invite preview")
         return InvitePreview(preview, self._client)
 
-    def add_command(self, command: Command) -> None:
-        """Register a command under its name and every alias.
-
-        :param command: The command to register.
-        :raises ValueError: If the name or an alias is already registered.
-        """
+    def _add_command(self, command: Command) -> None:
         for key in (command.name, *command.aliases):
             if key in self._commands:
                 raise ValueError(f"Command name {key!r} is already registered")
             self._commands[key] = command
+
+    def add_commands(self, cls: type[Commands]) -> None:
+        """Instantiate a :class:`~osmium_chat.commands.Commands` subclass and
+        register all its decorated commands and listeners.
+
+        :param cls: An uninitialised :class:`~osmium_chat.commands.Commands`
+            subclass.
+        :raises ValueError: If any command name or alias is already registered.
+        """
+        instance = cls(self)
+        for attr_name in dir(cls):
+            if attr_name.startswith("_"):
+                continue
+            attr = getattr(cls, attr_name, None)
+            if attr is None:
+                continue
+            cmd_meta = getattr(attr, "_command_meta", None)
+            if cmd_meta is not None:
+                bound = getattr(instance, attr_name)
+                name = cmd_meta.name or attr_name
+                self._add_command(Command(bound, name=name, aliases=cmd_meta.aliases, restriction=cmd_meta.restriction))
+                continue
+            listen_meta = getattr(attr, "_listen_meta", None)
+            if listen_meta is not None:
+                bound = getattr(instance, attr_name)
+                self._listeners.setdefault(listen_meta.event, []).append(bound)
+
+    def remove_commands(self, cls: type[Commands]) -> None:
+        """Remove all commands and listeners that were registered from *cls*.
+
+        :param cls: The same :class:`~osmium_chat.commands.Commands` subclass
+            that was passed to :meth:`add_commands`.
+        """
+        for attr_name in dir(cls):
+            if attr_name.startswith("_"):
+                continue
+            attr = getattr(cls, attr_name, None)
+            if attr is None:
+                continue
+            cmd_meta = getattr(attr, "_command_meta", None)
+            if cmd_meta is not None:
+                name = cmd_meta.name or attr_name
+                cmd = self._commands.get(name)
+                if cmd is not None:
+                    for key in [k for k, v in self._commands.items() if v is cmd]:
+                        del self._commands[key]
+                continue
+            listen_meta = getattr(attr, "_listen_meta", None)
+            if listen_meta is not None:
+                event = listen_meta.event
+                handlers = self._listeners.get(event, [])
+                self._listeners[event] = [
+                    h for h in handlers
+                    if getattr(h, "__func__", None) is not attr
+                ]
 
     def get_command(self, name: str) -> Command | None:
         """Look up a command by name or alias.
@@ -223,14 +229,14 @@ class Bot:
             prefix=self.prefix,
         )
 
-        await self.dispatch("message", ctx)
+        await self.dispatch("message", message)
         # Fire the finer-grained event for where the message came from. A
         # ``chat_ref`` carrying a ``channel`` is a community (guild) channel; one
         # carrying a ``user`` is a direct message.
         if chat_ref.channel is not None:
-            await self.dispatch("guild_message", ctx)
+            await self.dispatch("guild_message", message)
         elif chat_ref.user is not None:
-            await self.dispatch("dm_message", ctx)
+            await self.dispatch("dm_message", message)
 
         # Never react to our own messages, to avoid command loops.
         if self.user is not None and message.author_id == self.user.id:

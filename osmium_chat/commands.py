@@ -1,9 +1,9 @@
 """Command parsing and argument conversion.
 
-Commands are registered on a :class:`~osmium_chat.bot.Bot` with the
-``@bot.command`` decorator.  The first parameter of every callback always
-receives the :class:`~osmium_chat.context.Context`; each subsequent parameter
-is parsed from the message text following the command name.
+Commands are defined by subclassing :class:`Commands` and decorating methods
+with :func:`command`, :func:`guild_command`, or :func:`dm_command`. Event
+listeners are decorated with :func:`listen`. Register the subclass with
+:meth:`~osmium_chat.bot.Bot.add_commands`.
 
 **Basic types**
 
@@ -38,9 +38,10 @@ Annotating a parameter as ``A | B`` (or ``Union[A, B]``) tells the parser to
 try each candidate type in declaration order, accepting the first one that
 succeeds::
 
-    @bot.command("target")
-    async def target(ctx: Context, who: User | Channel) -> None:
-        ...
+    class Targeting(commands.Commands):
+        @commands.command("target")
+        async def target(self, ctx: Context, who: User | Channel) -> None:
+            ...
 
     # !target @alice   → who is a User
     # !target #general → who is a Channel
@@ -66,17 +67,19 @@ next character inside quotes::
 A keyword-only parameter (declared after a bare ``*``) consumes the entire
 remaining message as one unsplit string::
 
-    @bot.command("say")
-    async def say(ctx: Context, *, words: str) -> None:
-        await ctx.channel.send(words)
+    class SayCommands(commands.Commands):
+        @commands.command("say")
+        async def say(self, ctx: Context, *, words: str) -> None:
+            await ctx.channel.send(words)
 
     # !say hello there world   →   words == "hello there world"
 
 A variadic ``*args`` parameter collects every remaining token::
 
-    @bot.command("sum")
-    async def sum_(ctx: Context, *numbers: int) -> None:
-        await ctx.channel.send(str(sum(numbers)))
+    class MathCommands(commands.Commands):
+        @commands.command("sum")
+        async def sum_(self, ctx: Context, *numbers: int) -> None:
+            await ctx.channel.send(str(sum(numbers)))
 
     # !sum 1 2 3   →   numbers == (1, 2, 3)
 """
@@ -102,12 +105,17 @@ if TYPE_CHECKING:
 
 __all__: tuple[str, ...] = (
     "Command",
+    "CommandCallback",
     "CommandRestriction",
+    "Commands",
     "CONTEXT_CONVERTERS",
     "CONVERTERS",
     "Parameter",
     "StringView",
-    "CommandCallback",
+    "command",
+    "dm_command",
+    "guild_command",
+    "listen",
 )
 
 _ROLE_MENTION_RE = re.compile(r"^&(.+)$")
@@ -123,6 +131,82 @@ class CommandRestriction(Enum):
 
 
 CommandCallback = Callable[..., Awaitable[None]]
+
+
+class _CommandMeta:
+    __slots__ = ("name", "aliases", "restriction")
+
+    def __init__(
+        self,
+        name: str | None,
+        aliases: tuple[str, ...],
+        restriction: "CommandRestriction",
+    ) -> None:
+        self.name = name
+        self.aliases = aliases
+        self.restriction = restriction
+
+
+class _ListenMeta:
+    __slots__ = ("event",)
+
+    def __init__(self, event: str) -> None:
+        self.event = event
+
+
+def command(
+    name: str | None = None,
+    *,
+    aliases: tuple[str, ...] = (),
+    restriction: "CommandRestriction" = None,  # type: ignore[assignment]
+) -> Callable[[CommandCallback], CommandCallback]:
+    """Mark a :class:`Commands` method as a bot command.
+
+    :param name: The command name; defaults to the method name.
+    :param aliases: Additional names the command responds to.
+    :param restriction: Where the command may be invoked.
+    """
+    if restriction is None:
+        restriction = CommandRestriction.NONE
+
+    def decorator(func: CommandCallback) -> CommandCallback:
+        func._command_meta = _CommandMeta(name, aliases, restriction)  # type: ignore[attr-defined]
+        return func
+
+    return decorator
+
+
+def guild_command(
+    name: str | None = None,
+    *,
+    aliases: tuple[str, ...] = (),
+) -> Callable[[CommandCallback], CommandCallback]:
+    """Shorthand for ``@command(..., restriction=CommandRestriction.COMMUNITY_ONLY)``."""
+    return command(name=name, aliases=aliases, restriction=CommandRestriction.COMMUNITY_ONLY)
+
+
+def dm_command(
+    name: str | None = None,
+    *,
+    aliases: tuple[str, ...] = (),
+) -> Callable[[CommandCallback], CommandCallback]:
+    """Shorthand for ``@command(..., restriction=CommandRestriction.DM_ONLY)``."""
+    return command(name=name, aliases=aliases, restriction=CommandRestriction.DM_ONLY)
+
+
+def listen(event: str) -> Callable[[CommandCallback], CommandCallback]:
+    """Mark a :class:`Commands` method as an event listener.
+
+    :param event: The event name to listen for (e.g. ``"connect"``,
+        ``"message"``, ``"guild_message"``, ``"dm_message"``,
+        ``"command_error"``).
+    """
+    def decorator(func: CommandCallback) -> CommandCallback:
+        func._listen_meta = _ListenMeta(event)  # type: ignore[attr-defined]
+        return func
+
+    return decorator
+
 
 _TRUE = frozenset({"true", "t", "yes", "y", "1", "on", "enable", "enabled"})
 _FALSE = frozenset({"false", "f", "no", "n", "0", "off", "disable", "disabled"})
@@ -708,3 +792,52 @@ class Command:
         ctx.command = self
         ctx.args = args
         await self.callback(ctx, *args, **kwargs)
+
+
+class Commands:
+    """Base class for a collection of related bot commands and listeners.
+
+    Subclass this, decorate methods with :func:`command`, :func:`guild_command`,
+    or :func:`dm_command`, and add event listeners with :func:`listen`. Then
+    register the subclass (uninitialised) with
+    :meth:`~osmium_chat.bot.Bot.add_commands`.
+
+    .. code-block:: python
+
+        from osmium_chat import Bot, Context, Message, commands
+
+        class MyCommands(commands.Commands):
+            def __init__(self, bot: Bot) -> None:
+                self.bot = bot
+
+            @commands.listen("connect")
+            async def on_connect(self) -> None:
+                print("connected!")
+
+            @commands.listen("message")
+            async def on_message(self, message: Message) -> None:
+                print(message.content)
+
+            @commands.command("ping")
+            async def ping(self, ctx: Context) -> None:
+                await ctx.channel.send("pong")
+
+            @commands.guild_command("info")
+            async def info(self, ctx: Context) -> None:
+                await ctx.reply(f"Community: {ctx.community.name}")
+
+            @commands.dm_command("help")
+            async def help(self, ctx: Context) -> None:
+                await ctx.channel.send("Commands: ping, info, help")
+
+        bot = Bot(prefix="!", client_id=12345)
+        bot.add_commands(MyCommands)
+        bot.run(token="...")
+    """
+
+    if TYPE_CHECKING:
+        from osmium_chat.bot import Bot
+
+    def __init__(self, bot: "Bot") -> None:
+        """:param bot: The :class:`~osmium_chat.bot.Bot` this collection is attached to."""
+        self.bot = bot

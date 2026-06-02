@@ -14,9 +14,8 @@ Commands
 from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
-from osmium_chat.bot import Bot
+from osmium_chat import Bot, Context, commands
 from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Strikethrough, Underline
-from osmium_chat.context import Context
 from osmium_chat.mentions import UserMention
 
 
@@ -29,61 +28,57 @@ logger.addHandler(_handler)
 bot = Bot(prefix="!", client_id=00000, logger=logger)
 
 
-@bot.on("connect")
-async def on_connect() -> None:
-    logger.info("Bot connected")
+class MessageCommands(commands.Commands):
+    @commands.listen("connect")
+    async def on_connect(self) -> None:
+        logger.info("Bot connected")
+
+    @commands.command("say")
+    async def say(self, ctx: Context, *, words: str | None = None) -> None:
+        await ctx.channel.send(words or "You didn't say anything!")
+
+    @commands.command("markdowntest")
+    async def markdowntest(self, ctx: Context) -> None:
+        await ctx.channel.send(Content(
+            "Hello", Bold("world"), Italic("italic"),
+            Code("code"),
+            CodeBlock("code block"),
+            Strikethrough("strikethrough"),
+            Underline("underline"),
+            Underline(Bold(Italic(f"combined {Strikethrough('formatting')}"))),
+        ))
+
+    @commands.command("editmsg")
+    async def editmsg(self, ctx: Context) -> None:
+        message = await ctx.channel.send("This message will edit itself...")
+        await message.edit("(edited by the bot)")
+
+    @commands.command("delete")
+    async def delete(self, ctx: Context) -> None:
+        await ctx.message.delete()
+
+    @commands.command("sum")
+    async def sum_(self, ctx: Context, *numbers: int) -> None:
+        await ctx.channel.send(str(sum(numbers)))
+
+    @commands.command("dm")
+    async def dm(self, ctx: Context) -> None:
+        if ctx.author is None:
+            await ctx.channel.send("I don't know who you are!")
+            return
+        # requires the user to have opened a DM channel first
+        await ctx.author.dm_channel.send("hi there!")
+
+    @commands.command("whoami")
+    async def whoami(self, ctx: Context) -> None:
+        author = ctx.message.author
+        if author is None:
+            await ctx.reply("I don't know who you are!")
+            return
+        await ctx.channel.send(Content("You are ", UserMention(author), "!"))
 
 
-@bot.command("say")
-async def say(ctx: Context, *, words: str | None = None) -> None:
-    await ctx.channel.send(words or "You didn't say anything!")
-
-
-@bot.command("markdowntest")
-async def markdowntest(ctx: Context) -> None:
-    await ctx.channel.send(Content(
-        "Hello", Bold("world"), Italic("italic"),
-        Code("code"),
-        CodeBlock("code block"),
-        Strikethrough("strikethrough"),
-        Underline("underline"),
-        Underline(Bold(Italic(f"combined {Strikethrough('formatting')}"))),
-    ))
-
-
-@bot.command("editmsg")
-async def editmsg(ctx: Context) -> None:
-    message = await ctx.channel.send("This message will edit itself...")
-    await message.edit("(edited by the bot)")
-
-
-@bot.command("delete")
-async def delete(ctx: Context) -> None:
-    await ctx.message.delete()
-
-
-@bot.command("sum")
-async def sum_(ctx: Context, *numbers: int) -> None:
-    await ctx.channel.send(str(sum(numbers)))
-
-
-@bot.command("dm")
-async def dm(ctx: Context) -> None:
-    if ctx.author is None:
-        await ctx.channel.send("I don't know who you are!")
-        return
-    # requires the user to have opened a DM channel first
-    await ctx.author.dm_channel.send("hi there!")
-
-
-@bot.command("whoami")
-async def whoami(ctx: Context) -> None:
-    author = ctx.message.author
-    if author is None:
-        await ctx.reply("I don't know who you are!")
-        return
-    await ctx.channel.send(Content("You are ", UserMention(author), "!"))
-
+bot.add_commands(MessageCommands)
 
 if __name__ == "__main__":
     run(bot.connect(token="..."))
