@@ -76,6 +76,19 @@ class Community:
         self._client = client
 
     @classmethod
+    def from_id(cls, community_id: int, client: "Client") -> "Community":
+        """Build a minimal community stub from a bare id.
+
+        Only :attr:`id` is meaningful; all other descriptive fields are their
+        zero/default values until you call :meth:`fetch_channels`,
+        :meth:`fetch_roles`, or similar methods that hit the gateway.
+
+        :param community_id: The community's snowflake id.
+        :param client: The client used for subsequent operations.
+        """
+        return cls(PB_Community(id=community_id), client)
+
+    @classmethod
     def from_pb(
         cls,
         community: PB_Community,

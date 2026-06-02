@@ -87,11 +87,11 @@ async def delete(ctx: Context) -> None:
 
 @bot.command("newchannel")
 async def newchannel(ctx: Context, *, name: str = "general") -> None:
-    # Channels live on a Community; this assumes the command runs in one.
-    if ctx.channel.community_id is None:
+    if ctx.community is None:
         await ctx.reply("Run this in a community channel!")
         return
-    await ctx.reply(f"(pretend I made a #{name} channel)")
+    channel = await ctx.community.create_channel(name=name)
+    await ctx.reply(f"Created a new #{channel.id} channel!")
 
 
 @bot.command("rename")

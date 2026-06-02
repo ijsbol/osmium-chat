@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 from osmium_chat.channel import Channel
+from osmium_chat.community import Community
 from osmium_chat.message import Message
 from osmium_chat.user.user import User
 
@@ -28,6 +29,7 @@ class Context:
         "message",
         "author",
         "channel",
+        "community",
         "prefix",
         "command",
         "invoked_with",
@@ -41,6 +43,7 @@ class Context:
         message: Message,
         author: User | None,
         channel: Channel,
+        community: Community | None = None,
         prefix: str,
         command: "Command | None" = None,
         invoked_with: str | None = None,
@@ -52,6 +55,10 @@ class Context:
         :param message: The message that triggered the command.
         :param author: The user who sent the message, if known.
         :param channel: The channel the message was sent in.
+        :param community: The community the message was sent in, or ``None`` for
+            DMs and group chats. Only :attr:`~Community.id` is guaranteed to be
+            meaningful; call :meth:`~Community.fetch_channels` or similar to
+            populate the rest.
         :param prefix: The prefix the message was invoked with.
         :param command: The resolved command, if one matched.
         :param invoked_with: The name or alias actually used to invoke it.
@@ -61,6 +68,7 @@ class Context:
         self.message = message
         self.author = author
         self.channel = channel
+        self.community = community
         self.prefix = prefix
         self.command = command
         self.invoked_with = invoked_with

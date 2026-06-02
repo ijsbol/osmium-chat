@@ -7,6 +7,7 @@ from osmium_protos import PB_UpdateMessageCreated, PB_UseInvite
 
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
+from osmium_chat.community import Community
 from osmium_chat.commands import Command, CommandCallback, StringView
 from osmium_chat.context import Context
 from osmium_chat.errors import CommandError, CommandNotFound
@@ -179,12 +180,25 @@ class Bot:
 
         author = User(update.author, self._client) if update.author else None
         message = Message(update.message, self._client, author=author)
-        channel = Channel(update.message.chat_ref, self._client)
+        chat_ref = update.message.chat_ref
+        channel_ref = chat_ref.channel
+        channel = Channel(
+            chat_ref,
+            self._client,
+            id=channel_ref.channel_id if channel_ref is not None else None,
+            community_id=channel_ref.community_id if channel_ref is not None else None,
+        )
+        community = (
+            Community.from_id(channel_ref.community_id, self._client)
+            if channel_ref is not None
+            else None
+        )
         ctx = Context(
             bot=self,
             message=message,
             author=author,
             channel=channel,
+            community=community,
             prefix=self.prefix,
         )
 
@@ -192,7 +206,6 @@ class Bot:
         # Fire the finer-grained event for where the message came from. A
         # ``chat_ref`` carrying a ``channel`` is a community (guild) channel; one
         # carrying a ``user`` is a direct message.
-        chat_ref = update.message.chat_ref
         if chat_ref.channel is not None:
             await self.dispatch("guild_message", ctx)
         elif chat_ref.user is not None:
