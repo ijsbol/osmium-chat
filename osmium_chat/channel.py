@@ -19,6 +19,7 @@ from osmium_protos import (
 if TYPE_CHECKING:
     from osmium_chat.category import Category
     from osmium_chat.client import Client
+    from osmium_chat.community import Community
     from osmium_chat.invite import InvitePreview
     from osmium_chat.message import Message
 
@@ -66,6 +67,7 @@ class Channel:
         "position",
         "parent_id",
         "category",
+        "community",
     )
 
     def __init__(
@@ -79,6 +81,7 @@ class Channel:
         community_id: int | None = None,
         position: int | None = None,
         parent_id: int | None = None,
+        community: "Community | None" = None,
     ) -> None:
         """Bind a channel to a destination ref and the transport client.
 
@@ -90,6 +93,7 @@ class Channel:
         :param community_id: The owning community id, for a community channel.
         :param position: The channel's sort position within the community.
         :param parent_id: The id of the category channel this sits under, if any.
+        :param community: The owning :class:`~osmium_chat.community.Community`, if known.
         """
         self._chat_ref = chat_ref
         self._client = client
@@ -100,6 +104,7 @@ class Channel:
         self.position = position
         self.parent_id = parent_id
         self.category: "Category | None" = None
+        self.community: "Community | None" = community
 
     @classmethod
     def from_pb(cls, channel: PB_Channel, client: "Client") -> "Channel":

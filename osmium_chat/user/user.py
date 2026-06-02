@@ -8,6 +8,7 @@ from osmium_chat.user.status import UserStatus
 
 if TYPE_CHECKING:
     from osmium_chat.client import Client
+    from osmium_chat.community import Community
 
 
 __all__: tuple[str, ...] = (
@@ -27,13 +28,21 @@ class User:
         "icon",
         "color",
         "dm_channel",
+        "community",
     )
 
-    def __init__(self, user: PB_User, client: "Client") -> None:
+    def __init__(
+        self,
+        user: PB_User,
+        client: "Client",
+        *,
+        community: "Community | None" = None,
+    ) -> None:
         """Build a user from a protobuf payload.
 
         :param user: The raw ``PB_User`` to read fields from.
         :param client: The client used to deliver messages to this user.
+        :param community: The community this user was seen in, if known.
         """
         self.id: int = user.id
         self.name: str = user.name
@@ -46,3 +55,4 @@ class User:
             PB_ChatRef(user=PB_UserRef(user_id=self.id)),
             client,
         )
+        self.community: "Community | None" = community

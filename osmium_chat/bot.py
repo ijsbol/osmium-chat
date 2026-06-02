@@ -226,19 +226,23 @@ class Bot:
         if update.message is None or update.message.chat_ref is None:
             return
 
-        author = User(update.author, self._client) if update.author else None
         chat_ref = update.message.chat_ref
         channel_ref = chat_ref.channel
+        community = (
+            Community.from_id(channel_ref.community_id, self._client)
+            if channel_ref is not None
+            else None
+        )
+        author = (
+            User(update.author, self._client, community=community)
+            if update.author else None
+        )
         channel = Channel(
             chat_ref,
             self._client,
             id=channel_ref.channel_id if channel_ref is not None else None,
             community_id=channel_ref.community_id if channel_ref is not None else None,
-        )
-        community = (
-            Community.from_id(channel_ref.community_id, self._client)
-            if channel_ref is not None
-            else None
+            community=community,
         )
         message = Message(
             update.message,

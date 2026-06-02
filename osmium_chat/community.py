@@ -121,6 +121,8 @@ class Community:
         self.photo: Photo | None = Photo(community.photo) if community.photo else None
         self.channels: list[Channel] = channels if channels is not None else []
         self.categories: list[Category] = categories if categories is not None else []
+        for ch in self.channels:
+            ch.community = self
         self.roles: list[Role] = roles if roles is not None else []
         self.custom_emojis: list[CustomEmoji] = []
         self._client = client
@@ -316,6 +318,8 @@ class Community:
             self.channels, self.categories = _build_channels(pb.channels, self._client)
         else:
             self.channels, self.categories = [], []
+        for ch in self.channels:
+            ch.community = self
         return self.channels
 
     async def fetch_roles(self) -> list[Role]:
