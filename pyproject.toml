@@ -13,7 +13,7 @@ Homepage = "https://github.com/ijsbol/osmium-chat"
 
 [tool.poetry.dependencies]
 python = ">=3.13,<4.0"
-osmium-protos = ">=2.0.0"
+osmium-protos = "2.0.1"
 websockets = ">=16.0"
 
 [tool.poetry.group.dev.dependencies]

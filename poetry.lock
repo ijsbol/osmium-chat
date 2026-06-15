@@ -676,14 +676,14 @@ files = [
 
 [[package]]
 name = "osmium-protos"
-version = "2.0.0"
+version = "2.0.1"
 description = "Python compiled Osmium protos package."
 optional = false
 python-versions = "<4.0,>=3.13"
 groups = ["main"]
 files = [
-    {file = "osmium_protos-2.0.0-py3-none-any.whl", hash = "sha256:0213dc3128f01ff8b51f233f516458e059fbb16bba50e377c2382cd093abde94"},
-    {file = "osmium_protos-2.0.0.tar.gz", hash = "sha256:2966abac949287b7d0aac752b69e29c5f5bf814014413429d57c0a958d1f04ab"},
+    {file = "osmium_protos-2.0.1-py3-none-any.whl", hash = "sha256:f7891960475adea0b6e15b76d4bb59b90ada0e39fd6c11837039a5e75fb16ef9"},
+    {file = "osmium_protos-2.0.1.tar.gz", hash = "sha256:7aa96b982378681423e5cee9c3ea05aac22aa977dd4a1336b7f3f34ea78bc024"},
 ]
 
 [package.dependencies]
@@ -1224,4 +1224,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "f157d8325af954e03b99dcd687261c378b854c3702c5bf1222b307dd66d5e5fb"
+content-hash = "99618cacbef764d3ebbeffae2cf1196556e6e2448787c2aff11a3b2b0fa57977"
