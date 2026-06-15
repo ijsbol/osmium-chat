@@ -118,7 +118,7 @@ class Community:
         self.username: str | None = community.username
         self.owner: bool = community.owner
         self.permissions: CommunityPermission = CommunityPermission(community.permissions)
-        self.photo: Photo | None = Photo(community.photo) if community.photo else None
+        self.photo: Photo | None = Photo(community.photo, client) if community.photo else None
         self.channels: list[Channel] = channels if channels is not None else []
         self.categories: list[Category] = categories if categories is not None else []
         for ch in self.channels:
