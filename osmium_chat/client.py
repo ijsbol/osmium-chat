@@ -10,6 +10,7 @@ from osmium_chat import __version__
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 from osmium_protos import (
+    PB_FileMetadataMetadataImage,
     unwrap,
     wrap,
     PB_Authorization,
@@ -217,6 +218,7 @@ class Client:
         data: bytes,
         filename: str,
         mimetype: str = "application/octet-stream",
+        send_as_file: bool = False,
     ) -> tuple[PB_UploadedFileRef, PB_MediaRef]:
         """Upload ``data`` to the Osmium media service in chunks.
 
@@ -248,11 +250,20 @@ class Client:
             name=filename,
             part_count=len(parts),
         )
+
+        # if you mark `send_as_file=True` it will be sent as a downloadable file (not embedding!), mimicking the client behavior.
+        # otherwise, it sends it with image metadata... which gets automatically inferred to the correct metadata server-side
+        # yes, you can send a text file with image metadata and that will server-side automatically infer to a text file.
+        if send_as_file:
+            metadata = PB_FileMetadata(file=PB_FileMetadataMetadataFile())
+        else:
+            metadata = PB_FileMetadata(image=PB_FileMetadataMetadataImage())
+
         media_ref = PB_MediaRef(uploaded=PB_MediaRefUploadedFile(
             file=file_ref,
             filename=filename,
             mimetype=mimetype,
-            metadata=PB_FileMetadata(file=PB_FileMetadataMetadataFile()),
+            metadata=metadata,
         ))
         return file_ref, media_ref
 
