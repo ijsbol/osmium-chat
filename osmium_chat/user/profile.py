@@ -25,6 +25,8 @@ class Profile:
         "bio",
         "premium_since",
         "banner",
+        "mutual_communities",
+        "mutual_friends",
     )
 
     def __init__(self, profile: PB_Profile, client: "Client") -> None:
@@ -39,3 +41,5 @@ class Profile:
         self.banner: Photo | None = (
             Photo(profile.banner, client) if profile.banner else None
         )
+        self.mutual_communities: list[int] = list(profile.mutual_communities)
+        self.mutual_friends: list[int] = list(profile.mutual_friends)

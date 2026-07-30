@@ -6,19 +6,39 @@ __version__: str = version("osmium-chat")
 # Imported after ``__version__`` is defined, since the submodules read it at
 # import time.
 from osmium_chat.bot import Bot
-from osmium_chat.channel import Channel, ChannelType
+from osmium_chat.button import Button, ClipboardButton, LinkButton
+from osmium_chat.channel import Channel, ChannelFlag, ChannelType
+from osmium_chat.chat_member import ChatMember
 from osmium_chat.commands import Command, CommandRestriction, Commands, command, dm_command, guild_command, listen
 from osmium_chat.community import Community
 from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Spoiler, Strikethrough, TextUrl, Underline, UnicodeEmoji
 from osmium_chat.emoji import CustomEmoji
-from osmium_chat.file import File
+from osmium_chat.file import (
+    AudioMetadata,
+    CustomEmojiMetadata,
+    File,
+    FileMarkerMetadata,
+    FileMetadata,
+    ImageMetadata,
+    VideoMetadata,
+)
+from osmium_chat.forward import ForwardInfo
 from osmium_chat.invite import Invite
 from osmium_chat.member import Member
+from osmium_chat.media import MediaEmbed, MessageMedia
+from osmium_chat.message_options import MessageCloak, MessageQuote
+from osmium_chat.interaction import Interaction
 from osmium_chat.context import Context
 from osmium_chat.mentions import UserMention
 from osmium_chat.message import Message
-from osmium_chat.permissions import CommunityPermission
+from osmium_chat.permissions import (
+    ChannelOverride,
+    ChannelOverrides,
+    CommunityPermission,
+    PermissionOverrides,
+)
 from osmium_chat.photo import Photo
+from osmium_chat.user.profile import Profile
 from osmium_chat.reaction import Reaction
 from osmium_chat.role import Role
 from osmium_chat.user.user import User
@@ -27,7 +47,12 @@ __all__: tuple[str, ...] = (
     "__version__",
     "Bold",
     "Bot",
+    "Button",
     "Channel",
+    "ChannelFlag",
+    "ChannelOverride",
+    "ChannelOverrides",
+    "ChatMember",
     "ChannelType",
     "Code",
     "CodeBlock",
@@ -38,13 +63,28 @@ __all__: tuple[str, ...] = (
     "CommunityPermission",
     "Content",
     "Context",
+    "ClipboardButton",
     "CustomEmoji",
+    "AudioMetadata",
+    "CustomEmojiMetadata",
     "File",
+    "FileMarkerMetadata",
+    "FileMetadata",
+    "ForwardInfo",
     "Invite",
+    "ImageMetadata",
+    "Interaction",
     "Italic",
     "Member",
+    "MediaEmbed",
     "Message",
+    "MessageCloak",
+    "MessageQuote",
+    "MessageMedia",
+    "LinkButton",
     "Photo",
+    "Profile",
+    "PermissionOverrides",
     "Reaction",
     "Role",
     "Spoiler",
@@ -54,6 +94,7 @@ __all__: tuple[str, ...] = (
     "UnicodeEmoji",
     "User",
     "UserMention",
+    "VideoMetadata",
     "command",
     "dm_command",
     "guild_command",
