@@ -51,6 +51,8 @@ class Bot:
       when the message was sent in a community (guild) channel.
     - ``dm_message`` — fired with a :class:`~osmium_chat.message.Message`
       when the message was a direct message to the bot.
+    - ``interaction`` — fired with an :class:`~osmium_chat.interaction.Interaction`
+      when no registered button matches the interaction data.
     - ``command_error`` — fired with ``(ctx, error)`` when a command lookup or
       invocation fails.
 

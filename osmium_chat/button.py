@@ -78,6 +78,8 @@ class Button:
         """Submit this button as a client-side interaction for ``message``."""
         from osmium_protos import PB_SubmitInteraction
 
+        if not self.interactive:
+            raise ValueError("Only interaction buttons can be submitted")
         if message.chat_ref is None:
             raise ValueError("Cannot submit a button without a message chat ref")
         result = await message._client.request(PB_SubmitInteraction(
