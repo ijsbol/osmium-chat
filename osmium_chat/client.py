@@ -268,6 +268,7 @@ class Client:
         filename: str,
         mimetype: str = "application/octet-stream",
         send_as_file: bool = False,
+        animated: bool = False,
     ) -> tuple[PB_UploadedFileRef, PB_MediaRef]:
         """Upload ``data`` to the Osmium media service in chunks.
 
@@ -306,7 +307,9 @@ class Client:
         if send_as_file:
             metadata = PB_FileMetadata(file=PB_FileMetadataMetadataFile())
         else:
-            metadata = PB_FileMetadata(image=PB_FileMetadataMetadataImage())
+            metadata = PB_FileMetadata(
+                image=PB_FileMetadataMetadataImage(animated=animated),
+            )
 
         media_ref = PB_MediaRef(uploaded=PB_MediaRefUploadedFile(
             file=file_ref,

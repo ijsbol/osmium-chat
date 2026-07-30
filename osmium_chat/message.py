@@ -283,6 +283,7 @@ class Message:
         *,
         mimetype: str = "application/octet-stream",
         send_as_file: bool = False,
+        animated: bool = False,
         quote: MessageQuote | None = None,
         suppress_embeds: bool = False,
         cloak: MessageCloak | None = None,
@@ -306,6 +307,7 @@ class Message:
             filename,
             mimetype,
             send_as_file=send_as_file,
+            animated=animated,
         )
         result = await self._client.request(PB_SendMessage(
             chat_ref=self.chat_ref,
