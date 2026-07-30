@@ -150,6 +150,19 @@ def test_button_routing_prefers_instance_callback() -> None:
     asyncio.run(run())
 
 
+def test_fixed_button_ids_can_be_reused_per_message() -> None:
+    bot = Bot("!", 1)
+    first = Button("First", "fixed")
+    second = Button("Second", "fixed")
+    bot._client.register_buttons(1, [[first]])
+    bot._client.register_buttons(2, [[second]])
+    assert bot._client.resolve_button(1, "fixed")[0] is first
+    assert bot._client.resolve_button(2, "fixed")[0] is second
+    assert bot._client.resolve_button(999, "fixed")[0] is second
+    bot._client.remove_buttons(2)
+    assert bot._client.resolve_button(999, "fixed")[0] is first
+
+
 def test_channel_metadata_from_proto() -> None:
     channel = Channel.from_pb(
         PB_Channel(

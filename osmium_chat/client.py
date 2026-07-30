@@ -105,9 +105,6 @@ class Client:
                     )
                 self._buttons_by_message[key] = (button, message)
                 if button._fixed_id:
-                    fixed = self._fixed_buttons.get(button.custom_id)
-                    if fixed is not None and fixed[0] is not button:
-                        raise ValueError(f"Fixed button id {button.custom_id!r} is already registered")
                     self._fixed_buttons[button.custom_id] = (button, message)
 
     def resolve_button(self, message_id: int, custom_id: str | None) -> tuple[Any, Any] | None:
@@ -125,11 +122,11 @@ class Client:
                 continue
             remaining = [
                 binding for (msg_id, custom_id), binding in self._buttons_by_message.items()
-                if custom_id == button.custom_id and binding[0] is button
+                if custom_id == button.custom_id
             ]
             if remaining:
                 self._fixed_buttons[button.custom_id] = remaining[-1]
-            elif self._fixed_buttons.get(button.custom_id, (None,))[0] is button:
+            else:
                 self._fixed_buttons.pop(button.custom_id, None)
 
     async def _handle_msg(self, message: Any) -> None:
