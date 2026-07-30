@@ -406,17 +406,23 @@ class Channel:
         self,
         role: "Role | int",
         *,
+        permissions: "PermissionOverrides | None" = None,
         allow: "CommunityPermission | int" = 0,
         deny: "CommunityPermission | int" = 0,
     ) -> "ChannelOverride":
         """Create or replace a role override for this channel."""
         ref = self._channel_ref
         role_id = role if isinstance(role, int) else role.id
+        wire_permissions = (
+            permissions.to_pb()
+            if permissions is not None
+            else PB_PermissionOverrides(pos=int(allow), neg=int(deny))
+        )
         result = await self._client.request(PB_CreateChannelOverride(
             community_id=ref.community_id,
             channel_id=ref.channel_id,
             role_id=role_id,
-            permissions=PB_PermissionOverrides(pos=int(allow), neg=int(deny)),
+            permissions=wire_permissions,
         ))
         from osmium_chat.permissions import ChannelOverride
 
