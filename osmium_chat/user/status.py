@@ -16,6 +16,7 @@ class UserStatusStatus(IntEnum):
 
     ONLINE = 0
     IDLE = 1
+    INVISIBLE = 5
 
 
 class UserStatus:
@@ -32,6 +33,11 @@ class UserStatus:
 
         :param status: The raw ``PB_UserStatus`` to read fields from.
         """
-        self.online: bool = status.online
-        self.status: UserStatusStatus | None = UserStatusStatus(status.status) if status.status else None
+        self.status: UserStatusStatus | None = (
+            UserStatusStatus(status.status) if status.status is not None else None
+        )
+        self.online: bool = self.status in (
+            UserStatusStatus.ONLINE,
+            UserStatusStatus.IDLE,
+        )
         self.activities: list[UserStatusActivity] = [UserStatusActivity(activity) for activity in status.activities]

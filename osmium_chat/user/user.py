@@ -52,7 +52,7 @@ class User:
         self.profile: Profile | None = None
         self._client = client
 
-    async def fetch_profile(self) -> Profile:
+    async def fetch_profile(self, *, include_mutuals: bool = False) -> Profile:
         """Fetch this user's extended profile and cache it on :attr:`profile`.
 
         Calls ``users.getProfile`` and wraps the result in a :class:`Profile`,
@@ -63,6 +63,7 @@ class User:
         """
         result = await self._client.request(PB_GetProfile(
             ref=PB_UserRef(user_id=self.id),
+            include_mutuals=include_mutuals,
         ))
         assert result.profile is not None
         self.profile = Profile(result.profile, self._client)

@@ -13,8 +13,8 @@ from osmium_protos import (
     PB_FileMetadataMetadataImage,
     unwrap,
     wrap,
-    PB_Authorization,
-    PB_Authorize,
+    PB_AuthAuthorization,
+    PB_AuthAuthorize,
     PB_FileMetadata,
     PB_FileMetadataMetadataCustomEmoji,
     PB_FileMetadataMetadataFile,
@@ -25,6 +25,8 @@ from osmium_protos import (
     PB_ServerMessage,
     PB_StickerPackRef,
     PB_UpdateMessageCreated,
+    PB_UpdateMessageDeleted,
+    PB_UpdateInteraction,
     PB_UploadFilePart,
     PB_UploadedFileRef,
 )
@@ -54,6 +56,8 @@ class Client:
         "_pending",
         "_req_counter",
         "_tasks",
+        "_buttons_by_message",
+        "_fixed_buttons",
     )
 
     WS_URL: str = "wss://ws-0.osmium.chat"
@@ -84,6 +88,49 @@ class Client:
         self._req_counter: int = 0
         # Strong references to in-flight dispatch tasks so they aren't GC'd.
         self._tasks: set[asyncio.Task[None]] = set()
+        self._buttons_by_message: dict[tuple[int, str], tuple[Any, Any]] = {}
+        self._fixed_buttons: dict[str, tuple[Any, Any]] = {}
+
+    def register_buttons(self, message_id: int, rows: Any, message: Any = None) -> None:
+        """Register local button instances against their sent message."""
+        for row in rows:
+            for button in row:
+                if not getattr(button, "interactive", True):
+                    continue
+                key = (message_id, button.custom_id)
+                existing = self._buttons_by_message.get(key)
+                if existing is not None and existing[0] is not button:
+                    raise ValueError(
+                        f"Button id {button.custom_id!r} is already registered for message {message_id}"
+                    )
+                self._buttons_by_message[key] = (button, message)
+                if button._fixed_id:
+                    fixed = self._fixed_buttons.get(button.custom_id)
+                    if fixed is not None and fixed[0] is not button:
+                        raise ValueError(f"Fixed button id {button.custom_id!r} is already registered")
+                    self._fixed_buttons[button.custom_id] = (button, message)
+
+    def resolve_button(self, message_id: int, custom_id: str | None) -> tuple[Any, Any] | None:
+        """Resolve a button by message-specific id, then by fixed id."""
+        if custom_id is None:
+            return None
+        return self._buttons_by_message.get((message_id, custom_id)) or self._fixed_buttons.get(custom_id)
+
+    def remove_buttons(self, message_id: int) -> None:
+        """Drop button registrations when a message is deleted."""
+        keys = [key for key in self._buttons_by_message if key[0] == message_id]
+        for key in keys:
+            button, _ = self._buttons_by_message.pop(key)
+            if not button._fixed_id:
+                continue
+            remaining = [
+                binding for (msg_id, custom_id), binding in self._buttons_by_message.items()
+                if custom_id == button.custom_id and binding[0] is button
+            ]
+            if remaining:
+                self._fixed_buttons[button.custom_id] = remaining[-1]
+            elif self._fixed_buttons.get(button.custom_id, (None,))[0] is button:
+                self._fixed_buttons.pop(button.custom_id, None)
 
     async def _handle_msg(self, message: Any) -> None:
         """Process a single decoded inbound message.
@@ -96,6 +143,11 @@ class Client:
         self._logger.debug(f"Received message: {message}")
         if isinstance(message, PB_UpdateMessageCreated):
             await self.bot.process_commands(message)
+        elif isinstance(message, PB_UpdateInteraction):
+            await self.bot.process_interaction(message)
+        elif isinstance(message, PB_UpdateMessageDeleted):
+            for message_id in message.message_ids:
+                self.remove_buttons(message_id)
 
     async def _handle_ws(self, **kwargs: Any) -> None:
         """Read and dispatch inbound messages until the connection closes.
@@ -348,7 +400,7 @@ class Client:
         await self._connection.recv()
 
         self._logger.info("Received initialization response, sending authorization...")
-        await self.send_pb(PB_Authorize(
+        await self.send_pb(PB_AuthAuthorize(
             token=token,
         ))
 
@@ -358,7 +410,7 @@ class Client:
         async for data in self._connection:
             try:
                 _, message = unwrap(cast(bytes, data))
-                if isinstance(message, PB_Authorization):
+                if isinstance(message, PB_AuthAuthorization):
                     self._handle_authorization(message)
                     break
                 else:
