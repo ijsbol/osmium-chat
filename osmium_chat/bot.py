@@ -6,7 +6,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from osmium_chat.invite import InvitePreview
 
-from osmium_protos import PB_CommunityMember, PB_LookupInvite, PB_UpdateMessageCreated, PB_UseInvite
+from osmium_protos import (
+    PB_CommunityMember,
+    PB_LookupInvite,
+    PB_UpdateInteraction,
+    PB_UpdateMessageCreated,
+    PB_UseInvite,
+)
 
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
@@ -16,6 +22,7 @@ from osmium_chat.context import Context
 from osmium_chat.errors import CommandError, CommandNotFound, CommandRestrictionError
 from osmium_chat.member import Member
 from osmium_chat.message import Message
+from osmium_chat.interaction import Interaction
 from osmium_chat.user.user import User
 
 
@@ -258,6 +265,7 @@ class Bot:
             author=author,
             channel=channel,
             community=community,
+            client_id=update.client_id,
         )
         ctx = Context(
             bot=self,
@@ -311,6 +319,26 @@ class Bot:
         except Exception as error:
             self._logger.exception("Unhandled error in command %r", name)
             await self.dispatch("command_error", ctx, error)
+
+    async def process_interaction(self, update: PB_UpdateInteraction) -> None:
+        """Route an interaction to its registered button or global listener."""
+        binding = self._client.resolve_button(update.message_id, update.data)
+        interaction = Interaction(
+            update.interaction_id,
+            update.user_id,
+            update.message_id,
+            update.data,
+            self._client,
+            message=binding[1] if binding is not None else None,
+        )
+        if binding is None:
+            await self.dispatch("interaction", interaction)
+            return
+        button, _ = binding
+        try:
+            await button.on_interaction(interaction)
+        except Exception:
+            self._logger.exception("Error handling button interaction %r", update.data)
 
     async def use_invite(self, invite_code: str) -> None:
         """Redeem an invite code on behalf of the bot.
