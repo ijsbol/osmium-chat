@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build distributions (Poetry)
+    name: Build distributions (uv)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -16,25 +16,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.13"
 
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-
       - name: Check pyproject + lockfile
         run: |
-          poetry check --lock
+          uv lock --check
 
       - name: Verify release tag matches package version
         if: github.event_name == 'release'
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          pkg="$(poetry version -s)"
+          pkg="$(uv version -s)"
           echo "Release tag: ${tag}"
           echo "Package version: ${pkg}"
           if [ "${tag}" != "${pkg}" ]; then
@@ -44,7 +39,7 @@ jobs:
 
       - name: Build sdist + wheel
         run: |
-          poetry build
+          uv build
           ls -la dist
 
       - name: Upload dist artifacts
