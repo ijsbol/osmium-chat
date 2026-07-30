@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from osmium_protos import (
@@ -5,6 +6,7 @@ from osmium_protos import (
     PB_ChatRef,
     PB_DeleteMessage,
     PB_EditMessage,
+    PB_ForwardMessage,
     PB_Message,
     PB_ReactionEmoji,
     PB_RemoveReaction,
@@ -13,7 +15,17 @@ from osmium_protos import (
 
 from osmium_chat.content import Content, UnicodeEmoji, parse_content
 from osmium_chat.file import File
+from osmium_chat.forward import ForwardInfo
 from osmium_chat.member import Member
+from osmium_chat.media import MessageMedia, MediaEmbed
+from osmium_chat.message_options import (
+    MessageCloak,
+    MessageQuote,
+    make_bot_info,
+    make_message_reply_info,
+    make_send_reply_to,
+)
+from osmium_chat.button import Button
 from osmium_chat.reaction import Reaction
 from osmium_chat.user.user import User
 
@@ -51,10 +63,17 @@ class Message:
         "content",
         "content_raw",
         "author_id",
+        "client_id",
         "author",
         "chat_ref",
         "reply_to",
+        "reply_quote",
+        "forward_info",
+        "cloak",
+        "buttons",
+        "media",
         "attachments",
+        "embeds",
         "reactions",
         "channel",
         "community",
@@ -69,6 +88,9 @@ class Message:
         author: "Member | User | None" = None,
         channel: "Channel | None" = None,
         community: "Community | None" = None,
+        client_id: int | None = None,
+        button_objects: Sequence[Sequence[Button]] | None = None,
+        cloak: MessageCloak | None = None,
     ) -> None:
         """Build a message from a protobuf payload.
 
@@ -88,20 +110,71 @@ class Message:
         self.content_raw: Content = parse_content(message.message, list(message.entities))
         self.content: str = message.message
         self.author_id: int = message.author_id
+        self.client_id: int | None = client_id
         self.author: Member | User | None = author
         self.chat_ref: PB_ChatRef | None = message.chat_ref
-        self.reply_to: int | None = message.reply_to
+        reply_info = message.reply
+        self.reply_to: int | None = (
+            reply_info.message_id if reply_info is not None else message.reply_to
+        )
+        self.reply_quote: MessageQuote | None = (
+            MessageQuote.from_pb(reply_info.quote)
+            if reply_info is not None and reply_info.quote is not None else None
+        )
+        self.forward_info: ForwardInfo | None = (
+            ForwardInfo(message.forward.date) if message.forward is not None else None
+        )
+        self.cloak: MessageCloak | None = cloak
+        self.buttons: list[list[Button]] = []
+        if message.bot_info is not None:
+            if message.bot_info.cloak is not None:
+                self.cloak = MessageCloak.from_pb(message.bot_info.cloak)
+            if message.bot_info.buttons is not None:
+                self.buttons = [
+                    [Button.from_pb(button) for button in row.buttons]
+                    for row in message.bot_info.buttons.rows
+                ]
+        if button_objects is not None:
+            self.buttons = [list(row) for row in button_objects]
+        self.media: list[MessageMedia] = [
+            MessageMedia(item, client) for item in message.media
+        ]
         self.attachments: list[File] = [
-            File(media.file.file, client)
-            for media in message.media
-            if media.file is not None and media.file.file is not None
+            item.file for item in self.media if item.file is not None
+        ]
+        self.embeds: list[MediaEmbed] = [
+            item.embed for item in self.media if item.embed is not None
         ]
         self.reactions: list[Reaction] = []
         self.channel: "Channel | None" = channel
         self.community: "Community | None" = community
         self._client = client
+        if button_objects is not None and self.id:
+            register = getattr(client, "register_buttons", None)
+            if register is not None:
+                register(self.id, self.buttons, self)
 
-    async def edit(self, content: "str | Content") -> "Message":
+    @property
+    def true_author_id(self) -> int:
+        """The real user id behind a cloaked message.
+
+        A cloaked message changes only the displayed identity; the wire
+        ``author_id`` remains the authoritative sender.
+        """
+        return self.author_id
+
+    @property
+    def is_cloaked(self) -> bool:
+        """Whether the message carries a pseudoidentity."""
+        return self.cloak is not None
+
+    async def edit(
+        self,
+        content: "str | Content | None" = None,
+        *,
+        suppress_embeds: bool = False,
+        buttons: Sequence[Sequence[Button]] | None = None,
+    ) -> "Message":
         """Edit this message's text content.
 
         Waits for the gateway to confirm the edit and updates
@@ -115,15 +188,28 @@ class Message:
         """
         if self.chat_ref is None:
             raise ValueError("Cannot edit a message without a chat ref")
-        new_raw = content if isinstance(content, Content) else Content(content)
+        new_raw = None
+        if content is not None:
+            new_raw = content if isinstance(content, Content) else Content(content)
         await self._client.request(PB_EditMessage(
             chat_ref=self.chat_ref,
             message_id=self.id,
-            message=new_raw.text,
-            entities=new_raw.entities,
+            message=new_raw.text if new_raw is not None else None,
+            entities=new_raw.entities if new_raw is not None else [],
+            suppress_embeds=suppress_embeds,
+            buttons=make_bot_info(None, buttons).buttons if buttons is not None else None,
         ))
-        self.content_raw = new_raw
-        self.content = new_raw.text
+        if new_raw is not None:
+            self.content_raw = new_raw
+            self.content = new_raw.text
+        if buttons is not None:
+            remove = getattr(self._client, "remove_buttons", None)
+            if remove is not None:
+                remove(self.id)
+            self.buttons = [list(row) for row in buttons]
+            register = getattr(self._client, "register_buttons", None)
+            if register is not None:
+                register(self.id, self.buttons, self)
         return self
 
     async def delete(self) -> None:
@@ -137,6 +223,9 @@ class Message:
             chat_ref=self.chat_ref,
             message_ids=[self.id],
         ))
+        remove = getattr(self._client, "remove_buttons", None)
+        if remove is not None:
+            remove(self.id)
 
     async def add_reaction(self, emoji: "CustomEmoji | UnicodeEmoji | str") -> None:
         """Add a reaction to this message.
@@ -156,6 +245,16 @@ class Message:
             chat_ref=self.chat_ref,
             message_id=self.id,
             emoji=_to_pb_reaction_emoji(emoji),
+        ))
+
+    async def forward_to(self, channel: "Channel") -> None:
+        """Forward this message to another channel."""
+        if self.chat_ref is None:
+            raise ValueError("Cannot forward a message without a chat ref")
+        await self._client.request(PB_ForwardMessage(
+            chat_ref=channel._chat_ref,
+            from_=self.chat_ref,
+            message_ids=[self.id],
         ))
 
     async def remove_reaction(self, emoji: "CustomEmoji | UnicodeEmoji | str") -> None:
@@ -183,6 +282,12 @@ class Message:
         filename: str,
         *,
         mimetype: str = "application/octet-stream",
+        send_as_file: bool = False,
+        quote: MessageQuote | None = None,
+        suppress_embeds: bool = False,
+        cloak: MessageCloak | None = None,
+        buttons: Sequence[Sequence[Button]] | None = None,
+        client_id: int | None = None,
     ) -> "Message":
         """Upload ``data`` and send it as a file reply to this message.
 
@@ -196,11 +301,19 @@ class Message:
         """
         if self.chat_ref is None:
             raise ValueError("Cannot reply to a message without a chat ref")
-        _, media_ref = await self._client.upload_file(data, filename, mimetype)
+        _, media_ref = await self._client.upload_file(
+            data,
+            filename,
+            mimetype,
+            send_as_file=send_as_file,
+        )
         result = await self._client.request(PB_SendMessage(
             chat_ref=self.chat_ref,
             media=[media_ref],
-            reply_to=self.id,
+            reply_to=make_send_reply_to(self.id, quote),
+            suppress_embeds=suppress_embeds,
+            bot_info=make_bot_info(cloak, buttons),
+            client_id=client_id,
         ))
         author = self._client.bot.user
         sent = result.sent_message
@@ -210,13 +323,25 @@ class Message:
                 message_id=sent.message_id if sent is not None else 0,
                 author_id=author.id if author is not None else 0,
                 media=[],
-                reply_to=self.id,
+                reply=make_message_reply_info(self.id, quote),
             ),
             self._client,
             author=author,
+            client_id=client_id,
+            button_objects=buttons,
+            cloak=cloak,
         )
 
-    async def reply(self, content: "str | Content") -> "Message":
+    async def reply(
+        self,
+        content: "str | Content",
+        *,
+        quote: MessageQuote | None = None,
+        suppress_embeds: bool = False,
+        cloak: MessageCloak | None = None,
+        buttons: Sequence[Sequence[Button]] | None = None,
+        client_id: int | None = None,
+    ) -> "Message":
         """Send a message to this message's conversation, threaded as a reply.
 
         Waits for the gateway to acknowledge the send so the returned message
@@ -235,7 +360,10 @@ class Message:
             chat_ref=self.chat_ref,
             message=content_obj.text,
             entities=content_obj.entities,
-            reply_to=self.id,
+            reply_to=make_send_reply_to(self.id, quote),
+            suppress_embeds=suppress_embeds,
+            bot_info=make_bot_info(cloak, buttons),
+            client_id=client_id,
         ))
         author = self._client.bot.user
         sent = result.sent_message
@@ -246,8 +374,11 @@ class Message:
                 author_id=author.id if author is not None else 0,
                 message=content_obj.text,
                 entities=content_obj.entities,
-                reply_to=self.id,
+                reply=make_message_reply_info(self.id, quote),
             ),
             self._client,
             author=author,
+            client_id=client_id,
+            button_objects=buttons,
+            cloak=cloak,
         )

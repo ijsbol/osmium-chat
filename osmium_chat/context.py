@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from osmium_chat.channel import Channel
@@ -5,11 +6,13 @@ from osmium_chat.community import Community
 from osmium_chat.content import Content
 from osmium_chat.member import Member
 from osmium_chat.message import Message
+from osmium_chat.message_options import MessageCloak, MessageQuote
 from osmium_chat.user.user import User
 
 if TYPE_CHECKING:
     from osmium_chat.bot import Bot
     from osmium_chat.commands import Command
+    from osmium_chat.button import Button
 
 
 __all__: tuple[str, ...] = (
@@ -79,7 +82,17 @@ class Context:
         self.invoked_with = invoked_with
         self.args: list[Any] = args if args is not None else []
 
-    async def send(self, content: "str | Content", *, reply_to: int | None = None) -> Message:
+    async def send(
+        self,
+        content: "str | Content",
+        *,
+        reply_to: "int | Message | None" = None,
+        quote: MessageQuote | None = None,
+        suppress_embeds: bool = False,
+        cloak: MessageCloak | None = None,
+        buttons: Sequence[Sequence["Button"]] | None = None,
+        client_id: int | None = None,
+    ) -> Message:
         """Send a message to the channel this command was invoked in.
 
         A shortcut for ``ctx.channel.send(...)``.
@@ -89,13 +102,38 @@ class Context:
         :param reply_to: Optional id of a message this should reply to.
         :returns: The newly created message.
         """
-        return await self.channel.send(content, reply_to=reply_to)
+        return await self.channel.send(
+            content,
+            reply_to=reply_to,
+            quote=quote,
+            suppress_embeds=suppress_embeds,
+            cloak=cloak,
+            buttons=buttons,
+            client_id=client_id,
+        )
 
-    async def reply(self, content: "str | Content") -> Message:
+    async def reply(
+        self,
+        content: "str | Content",
+        *,
+        quote: MessageQuote | None = None,
+        suppress_embeds: bool = False,
+        cloak: MessageCloak | None = None,
+        buttons: Sequence[Sequence["Button"]] | None = None,
+        client_id: int | None = None,
+    ) -> Message:
         """Reply to the invoking message, threading it as a reply.
 
         :param content: The message text, either a plain string or a
             :class:`~osmium_chat.content.Content` object.
         :returns: The newly created message.
         """
-        return await self.channel.send(content, reply_to=self.message.id)
+        return await self.channel.send(
+            content,
+            reply_to=self.message.id,
+            quote=quote,
+            suppress_embeds=suppress_embeds,
+            cloak=cloak,
+            buttons=buttons,
+            client_id=client_id,
+        )

@@ -1,9 +1,11 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from osmium_protos import (
     PB_DownloadFilePart,
     PB_File,
+    PB_FileMetadata,
     PB_FileRef,
     PB_FileRefMediaFileRef,
 )
@@ -13,11 +15,109 @@ if TYPE_CHECKING:
 
 
 __all__: tuple[str, ...] = (
+    "AudioMetadata",
     "File",
+    "FileMetadata",
+    "FileMarkerMetadata",
+    "ImageMetadata",
+    "VideoMetadata",
+    "CustomEmojiMetadata",
 )
 
 # 1 MiB per download request.
 _DOWNLOAD_CHUNK_SIZE: int = 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class ImageMetadata:
+    width: int
+    height: int
+    preview: bytes | None
+    animated: bool
+
+
+@dataclass(frozen=True, slots=True)
+class VideoMetadata:
+    width: int
+    height: int
+    duration: int
+
+
+@dataclass(frozen=True, slots=True)
+class AudioMetadata:
+    duration: int
+
+
+@dataclass(frozen=True, slots=True)
+class CustomEmojiMetadata:
+    width: int
+    height: int
+    emoji: str
+    pack_id: int | None
+    animated: bool
+
+
+@dataclass(frozen=True, slots=True)
+class FileMarkerMetadata:
+    """Marker metadata for a generic file attachment."""
+
+
+class FileMetadata:
+    """The typed metadata oneof attached to a media file."""
+
+    __slots__: tuple[str, ...] = (
+        "image",
+        "video",
+        "audio",
+        "file",
+        "custom_emoji",
+    )
+
+    def __init__(self, metadata: PB_FileMetadata) -> None:
+        self.image = (
+            ImageMetadata(
+                metadata.image.width,
+                metadata.image.height,
+                metadata.image.preview,
+                metadata.image.animated,
+            ) if metadata.image is not None else None
+        )
+        self.video = (
+            VideoMetadata(
+                metadata.video.width,
+                metadata.video.height,
+                metadata.video.duration,
+            ) if metadata.video is not None else None
+        )
+        self.audio = (
+            AudioMetadata(metadata.audio.duration)
+            if metadata.audio is not None else None
+        )
+        self.file: FileMarkerMetadata | None = (
+            FileMarkerMetadata() if metadata.file is not None else None
+        )
+        self.custom_emoji = (
+            CustomEmojiMetadata(
+                metadata.custom_emoji.width,
+                metadata.custom_emoji.height,
+                metadata.custom_emoji.emoji,
+                metadata.custom_emoji.pack.id
+                if metadata.custom_emoji.pack is not None else None,
+                metadata.custom_emoji.animated,
+            ) if metadata.custom_emoji is not None else None
+        )
+
+    @property
+    def kind(self) -> str:
+        if self.image is not None:
+            return "image"
+        if self.video is not None:
+            return "video"
+        if self.audio is not None:
+            return "audio"
+        if self.custom_emoji is not None:
+            return "custom_emoji"
+        return "file"
 
 
 class File:
@@ -33,6 +133,7 @@ class File:
         "size",
         "mimetype",
         "filename",
+        "metadata",
         "_client",
     )
 
@@ -47,7 +148,21 @@ class File:
         self.size: int = file.size
         self.mimetype: str = file.mimetype
         self.filename: str | None = file.filename
+        self.metadata: FileMetadata | None = (
+            FileMetadata(file.metadata) if file.metadata is not None else None
+        )
         self._client = client
+
+    @property
+    def animated(self) -> bool:
+        """Whether image or custom emoji metadata marks this file animated."""
+        if self.metadata is None:
+            return False
+        if self.metadata.image is not None:
+            return self.metadata.image.animated
+        if self.metadata.custom_emoji is not None:
+            return self.metadata.custom_emoji.animated
+        return False
 
     async def download(self) -> bytes:
         """Fetch and return the full file contents as :class:`bytes`.
