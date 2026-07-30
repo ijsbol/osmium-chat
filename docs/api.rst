@@ -21,6 +21,13 @@ Context
 
 .. automodule:: osmium_chat.context
 
+Buttons and Interactions
+------------------------
+
+.. automodule:: osmium_chat.button
+
+.. automodule:: osmium_chat.interaction
+
 Channels
 --------
 
@@ -35,6 +42,10 @@ Messages
 --------
 
 .. automodule:: osmium_chat.message
+
+.. automodule:: osmium_chat.message_options
+
+.. automodule:: osmium_chat.forward
 
 Reactions
 ---------
@@ -91,6 +102,8 @@ Users
 
 .. automodule:: osmium_chat.user.user
 
+.. automodule:: osmium_chat.user.profile
+
 .. automodule:: osmium_chat.user.status
 
 .. automodule:: osmium_chat.user.activity
@@ -101,3 +114,10 @@ Media
 .. automodule:: osmium_chat.photo
 
 .. automodule:: osmium_chat.file
+
+.. automodule:: osmium_chat.media
+
+Chat Members
+------------
+
+.. automodule:: osmium_chat.chat_member
