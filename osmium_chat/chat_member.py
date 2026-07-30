@@ -58,7 +58,7 @@ class ChatMember:
         channel: "Channel | None" = None,
     ) -> "ChatMember":
         return cls(
-            User(user or PB_User(id=member.user_id), client),
+            User(user if user is not None else PB_User(id=member.user_id), client),
             client,
             permissions=member.permissions,
             channel=channel,

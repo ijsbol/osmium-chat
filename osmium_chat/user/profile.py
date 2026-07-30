@@ -35,11 +35,13 @@ class Profile:
         :param profile: The raw ``PB_Profile`` to read fields from.
         :param client: The client used to download the banner.
         """
-        self.user_id: int | None = profile.ref.user_id if profile.ref else None
+        self.user_id: int | None = (
+            profile.ref.user_id if profile.ref is not None else None
+        )
         self.bio: str = profile.bio
         self.premium_since: int | None = profile.premium_since
         self.banner: Photo | None = (
-            Photo(profile.banner, client) if profile.banner else None
+            Photo(profile.banner, client) if profile.banner is not None else None
         )
         self.mutual_communities: list[int] = list(profile.mutual_communities)
         self.mutual_friends: list[int] = list(profile.mutual_friends)

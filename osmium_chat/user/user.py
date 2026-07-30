@@ -41,8 +41,12 @@ class User:
         self.id: int = user.id
         self.name: str = user.name
         self.username: str | None = user.username
-        self.status: UserStatus | None = UserStatus(user.status) if user.status else None
-        self.photo: Photo | None = Photo(user.photo, client) if user.photo else None
+        self.status: UserStatus | None = (
+            UserStatus(user.status) if user.status is not None else None
+        )
+        self.photo: Photo | None = (
+            Photo(user.photo, client) if user.photo is not None else None
+        )
         self.icon: int | None = user.icon
         self.color: int | None = user.color
         self.dm_channel: Channel = Channel(
