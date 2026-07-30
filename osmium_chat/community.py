@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from osmium_protos import (
+    PB_AddMember,
     PB_AddStickerToPack,
     PB_ChannelType,
     PB_Community,
@@ -26,6 +27,7 @@ from osmium_chat.utils import locate_created
 
 if TYPE_CHECKING:
     from osmium_chat.client import Client
+    from osmium_chat.user.user import User
 
 
 def _build_channels(
@@ -197,6 +199,14 @@ class Community:
     async def delete(self) -> None:
         """Delete this community."""
         await self._client.send_pb(PB_DeleteCommunity(community_id=self.id))
+
+    async def add_member(self, user: "int | User") -> None:
+        """Add a user to this community."""
+        user_id = user if isinstance(user, int) else user.id
+        await self._client.request(PB_AddMember(
+            community_id=self.id,
+            user_id=user_id,
+        ))
 
     async def create_channel(
         self,

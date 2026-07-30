@@ -1,19 +1,42 @@
-from enum import IntEnum
+from enum import IntEnum, IntFlag
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from osmium_chat.content import Content
 
 from osmium_protos import (
+    PB_AddChatMember,
     PB_Channel,
+    PB_ChannelChannelFlag,
     PB_ChannelRef,
+    PB_ChatMembers,
     PB_ChatRef,
+    PB_CreateChannelOverride,
     PB_CreateChatInvite,
     PB_DeleteChannel,
+    PB_DeleteChannelOverride,
     PB_EditChannel,
+    PB_EditChannelHighlightedMessage,
+    PB_EditChatMember,
+    PB_GetChannelMembers,
+    PB_GetChannelOverrides,
+    PB_GetChatMembers,
     PB_ListChatInvites,
     PB_LookupInvite,
+    PB_MemberList,
     PB_Message,
+    PB_PermissionOverrides,
+    PB_RemoveChatMember,
     PB_SendMessage,
+    PB_SyncChannelOverrides,
+)
+
+from osmium_chat.message_options import (
+    MessageCloak,
+    MessageQuote,
+    make_bot_info,
+    make_message_reply_info,
+    make_send_reply_to,
 )
 
 if TYPE_CHECKING:
@@ -22,9 +45,15 @@ if TYPE_CHECKING:
     from osmium_chat.community import Community
     from osmium_chat.invite import InvitePreview
     from osmium_chat.message import Message
+    from osmium_chat.chat_member import ChatMember
+    from osmium_chat.button import Button
+    from osmium_chat.permissions import ChannelOverride, ChannelOverrides, CommunityPermission
+    from osmium_chat.role import Role
+    from osmium_chat.user.user import User
 
 
 __all__: tuple[str, ...] = (
+    "ChannelFlag",
     "ChannelType",
     "Channel",
 )
@@ -40,6 +69,14 @@ class ChannelType(IntEnum):
     TEXT = 0
     VOICE = 1
     CATEGORY = 2
+    ANNOUNCEMENT = 3
+
+
+class ChannelFlag(IntFlag):
+    """Bit flags attached to a community channel."""
+
+    NONE = 0
+    EXPLICIT = int(PB_ChannelChannelFlag.EXPLICIT)
 
 
 class Channel:
@@ -66,8 +103,13 @@ class Channel:
         "community_id",
         "position",
         "parent_id",
+        "flags",
+        "highlighted_message_id",
+        "description",
+        "slowmode_seconds",
         "category",
         "community",
+        "members",
     )
 
     def __init__(
@@ -81,6 +123,10 @@ class Channel:
         community_id: int | None = None,
         position: int | None = None,
         parent_id: int | None = None,
+        flags: ChannelFlag | int = ChannelFlag.NONE,
+        highlighted_message_id: int | None = None,
+        description: str | None = None,
+        slowmode_seconds: int | None = None,
         community: "Community | None" = None,
     ) -> None:
         """Bind a channel to a destination ref and the transport client.
@@ -103,8 +149,13 @@ class Channel:
         self.community_id = community_id
         self.position = position
         self.parent_id = parent_id
+        self.flags = ChannelFlag(flags)
+        self.highlighted_message_id = highlighted_message_id
+        self.description = description
+        self.slowmode_seconds = slowmode_seconds
         self.category: "Category | None" = None
         self.community: "Community | None" = community
+        self.members: list["ChatMember"] = []
 
     @classmethod
     def from_pb(cls, channel: PB_Channel, client: "Client") -> "Channel":
@@ -129,6 +180,10 @@ class Channel:
             community_id=channel.community_id,
             position=channel.position,
             parent_id=channel.parent_id,
+            flags=channel.flags,
+            highlighted_message_id=channel.highlighted_msg_id,
+            description=channel.description,
+            slowmode_seconds=channel.slowmode_seconds,
         )
 
     @property
@@ -143,7 +198,17 @@ class Channel:
             raise TypeError("Only community channels can be edited or deleted")
         return ref
 
-    async def send(self, content: "str | Content", *, reply_to: int | None = None) -> "Message":
+    async def send(
+        self,
+        content: "str | Content",
+        *,
+        reply_to: "int | Message | None" = None,
+        quote: MessageQuote | None = None,
+        suppress_embeds: bool = False,
+        cloak: MessageCloak | None = None,
+        buttons: Sequence[Sequence["Button"]] | None = None,
+        client_id: int | None = None,
+    ) -> "Message":
         """Send a message to this channel and return the created message.
 
         Waits for the gateway to acknowledge the send so the returned
@@ -164,7 +229,10 @@ class Channel:
             chat_ref=self._chat_ref,
             message=content_obj.text,
             entities=content_obj.entities,
-            reply_to=reply_to,
+            reply_to=make_send_reply_to(reply_to, quote),
+            suppress_embeds=suppress_embeds,
+            bot_info=make_bot_info(cloak, buttons),
+            client_id=client_id,
         ))
         author = self._client.bot.user
         sent = result.sent_message
@@ -175,10 +243,13 @@ class Channel:
                 author_id=author.id if author is not None else 0,
                 message=content_obj.text,
                 entities=content_obj.entities,
-                reply_to=reply_to,
+                reply=make_message_reply_info(reply_to, quote),
             ),
             self._client,
             author=author,
+            client_id=client_id,
+            button_objects=buttons,
+            cloak=cloak,
         )
 
     async def send_file(
@@ -187,7 +258,13 @@ class Channel:
         filename: str,
         *,
         mimetype: str = "application/octet-stream",
-        reply_to: int | None = None,
+        send_as_file: bool = False,
+        reply_to: "int | Message | None" = None,
+        quote: MessageQuote | None = None,
+        suppress_embeds: bool = False,
+        cloak: MessageCloak | None = None,
+        buttons: Sequence[Sequence["Button"]] | None = None,
+        client_id: int | None = None,
     ) -> "Message":
         """Upload ``data`` and send it as a file attachment to this channel.
 
@@ -201,11 +278,19 @@ class Channel:
         """
         from osmium_chat.message import Message
 
-        _, media_ref = await self._client.upload_file(data, filename, mimetype)
+        _, media_ref = await self._client.upload_file(
+            data,
+            filename,
+            mimetype,
+            send_as_file=send_as_file,
+        )
         result = await self._client.request(PB_SendMessage(
             chat_ref=self._chat_ref,
             media=[media_ref],
-            reply_to=reply_to,
+            reply_to=make_send_reply_to(reply_to, quote),
+            suppress_embeds=suppress_embeds,
+            bot_info=make_bot_info(cloak, buttons),
+            client_id=client_id,
         ))
         author = self._client.bot.user
         sent = result.sent_message
@@ -215,9 +300,13 @@ class Channel:
                 message_id=sent.message_id if sent is not None else 0,
                 author_id=author.id if author is not None else 0,
                 media=[],
+                reply=make_message_reply_info(reply_to, quote),
             ),
             self._client,
             author=author,
+            client_id=client_id,
+            button_objects=buttons,
+            cloak=cloak,
         )
 
     async def edit(
@@ -227,6 +316,9 @@ class Channel:
         position: int | None = None,
         parent_id: int | None = None,
         explicit: bool | None = None,
+        highlighted_message_id: int | None = None,
+        description: str | None = None,
+        slowmode_seconds: int | None = None,
     ) -> "Channel":
         """Edit this community channel's attributes.
 
@@ -249,6 +341,14 @@ class Channel:
             position=position,
             parent_id=parent_id,
             explicit=explicit,
+            highlighted_msg_id=(
+                PB_EditChannelHighlightedMessage(
+                    highlighted_msg_id=highlighted_message_id,
+                )
+                if highlighted_message_id is not None else None
+            ),
+            description=description,
+            slowmode_seconds=slowmode_seconds,
         ))
         if name is not None:
             self.name = name
@@ -256,6 +356,16 @@ class Channel:
             self.position = position
         if parent_id is not None:
             self.parent_id = parent_id
+        if explicit is True:
+            self.flags |= ChannelFlag.EXPLICIT
+        elif explicit is False:
+            self.flags &= ~ChannelFlag.EXPLICIT
+        if highlighted_message_id is not None:
+            self.highlighted_message_id = highlighted_message_id
+        if description is not None:
+            self.description = description
+        if slowmode_seconds is not None:
+            self.slowmode_seconds = slowmode_seconds
         return self
 
     async def delete(self) -> None:
@@ -264,6 +374,129 @@ class Channel:
         :raises TypeError: If this channel is not a community channel.
         """
         await self._client.send_pb(PB_DeleteChannel(channel=self._channel_ref))
+
+    async def fetch_overrides(self) -> "ChannelOverrides":
+        """Fetch role permission overrides and parent-sync state."""
+        ref = self._channel_ref
+        result = await self._client.request(PB_GetChannelOverrides(
+            community_id=ref.community_id,
+            channel_id=ref.channel_id,
+        ))
+        from osmium_chat.permissions import ChannelOverride, ChannelOverrides
+
+        payload = result.channel_overrides
+        if payload is None:
+            return ChannelOverrides((), False)
+        return ChannelOverrides(
+            tuple(ChannelOverride.from_pb(override) for override in payload.overrides),
+            payload.parent_sync,
+        )
+
+    async def sync_overrides(self) -> None:
+        """Make this channel inherit permission overrides from its parent."""
+        ref = self._channel_ref
+        await self._client.request(PB_SyncChannelOverrides(
+            community_id=ref.community_id,
+            channel_id=ref.channel_id,
+        ))
+
+    async def create_override(
+        self,
+        role: "Role | int",
+        *,
+        allow: "CommunityPermission | int" = 0,
+        deny: "CommunityPermission | int" = 0,
+    ) -> "ChannelOverride":
+        """Create or replace a role override for this channel."""
+        ref = self._channel_ref
+        role_id = role if isinstance(role, int) else role.id
+        result = await self._client.request(PB_CreateChannelOverride(
+            community_id=ref.community_id,
+            channel_id=ref.channel_id,
+            role_id=role_id,
+            permissions=PB_PermissionOverrides(pos=int(allow), neg=int(deny)),
+        ))
+        from osmium_chat.permissions import ChannelOverride
+
+        wrapper = result.channel_override
+        if wrapper is None or wrapper.override is None:
+            return ChannelOverride(ref.community_id, ref.channel_id, role_id, None)
+        return ChannelOverride.from_pb(wrapper.override)
+
+    async def delete_override(self, role: "Role | int") -> None:
+        """Delete a role override from this channel."""
+        ref = self._channel_ref
+        role_id = role if isinstance(role, int) else role.id
+        await self._client.request(PB_DeleteChannelOverride(
+            community_id=ref.community_id,
+            channel_id=ref.channel_id,
+            role_id=role_id,
+        ))
+
+    async def add_member(self, user: "User | int") -> None:
+        """Add a user to a group chat addressed by this channel."""
+        user_id = user if isinstance(user, int) else user.id
+        await self._client.request(PB_AddChatMember(
+            chat_ref=self._chat_ref,
+            user_id=user_id,
+        ))
+
+    async def remove_member(self, user: "User | int") -> None:
+        """Remove a user from this chat."""
+        user_id = user if isinstance(user, int) else user.id
+        await self._client.request(PB_RemoveChatMember(
+            chat_ref=self._chat_ref,
+            user_id=user_id,
+        ))
+
+    async def edit_member(self, user: "User | int", permissions: int) -> None:
+        """Replace a user's permissions in this chat."""
+        user_id = user if isinstance(user, int) else user.id
+        await self._client.request(PB_EditChatMember(
+            chat_ref=self._chat_ref,
+            user_id=user_id,
+            permissions=permissions,
+        ))
+
+    async def fetch_members(self) -> "list[ChatMember]":
+        """Fetch members for either a group chat or a community channel."""
+        from osmium_chat.chat_member import ChatMember
+        from osmium_chat.user.user import User
+
+        if self._chat_ref.channel is not None:
+            ref = self._channel_ref
+            result = await self._client.request(PB_GetChannelMembers(
+                community_id=ref.community_id,
+                channel_id=ref.channel_id,
+            ))
+            payload: PB_MemberList | None = result.member_list
+            members: list[ChatMember] = []
+            if payload is not None:
+                for entry in payload.entries:
+                    if entry.user is None or entry.user.user is None:
+                        continue
+                    members.append(ChatMember(
+                        User(entry.user.user, self._client),
+                        self._client,
+                        nickname=entry.user.nickname,
+                        channel=self,
+                    ))
+        else:
+            result = await self._client.request(PB_GetChatMembers(
+                chat_ref=self._chat_ref,
+            ))
+            payload = result.chat_members
+            members = []
+            if payload is not None:
+                users = {user.id: user for user in payload.users}
+                members = [ChatMember.from_pb(
+                    member,
+                    users.get(member.user_id),
+                    self._client,
+                    channel=self,
+                ) for member in payload.members]
+        self.members = members
+        return members
 
     async def create_invite(
         self,
