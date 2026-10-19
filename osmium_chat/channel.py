@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         ChannelOverride,
         ChannelOverrides,
         CommunityPermission,
+        PermissionOverrides,
     )
     from osmium_chat.role import Role
     from osmium_chat.user.user import User
