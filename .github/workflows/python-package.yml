@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies (uv)
         run: |
-          uv sync --no-interaction --group dev
+          uv sync --group dev
 
       - name: Lint with flake8
         run: |
