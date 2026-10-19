@@ -157,19 +157,23 @@ class Client:
         """
         assert self._connection is not None
 
-        async for data in self._connection:
-            try:
-                server = PB_ServerMessage.parse(cast(bytes, data))
-            except ConnectionClosed as e:
-                self._logger.error("WebSocket connection closed: %s", e)
-                raise ConnectionError("Connection closed unexpectedly") from e
-            except Exception:
-                self._logger.exception("Failed to parse inbound frame")
-                continue
+        try:
+            async for data in self._connection:
+                try:
+                    server = PB_ServerMessage.parse(cast(bytes, data))
+                except Exception:
+                    self._logger.exception("Failed to parse inbound frame")
+                    continue
 
-            if self._resolve_result(server):
-                continue
-            self._spawn(self._dispatch_frame(cast(bytes, data)))
+                if self._resolve_result(server):
+                    continue
+                self._spawn(self._dispatch_frame(cast(bytes, data)))
+        except ConnectionClosed as e:
+            self._logger.error("WebSocket connection closed: %s", e)
+            raise ConnectionError("Connection closed unexpectedly") from e
+
+        # ClientConnection.__aiter__ stops normally for clean websocket closes.
+        raise ConnectionError("Connection closed unexpectedly")
 
     def _resolve_result(self, server: PB_ServerMessage) -> bool:
         """Hand a server frame to the request that's waiting on it, if any.
@@ -407,17 +411,22 @@ class Client:
         # wait for authorization
         # most of the time it is the first or second message, but to be safe we will loop until we get it
         self._logger.info("Waiting for authorization...")
-        async for data in self._connection:
-            try:
+        authorized = False
+        try:
+            async for data in self._connection:
                 _, message = unwrap(cast(bytes, data))
                 if isinstance(message, PB_AuthAuthorization):
                     self._handle_authorization(message)
+                    authorized = True
                     break
-                else:
-                    await self._handle_msg(message)
-            except ConnectionClosed:
-                self._logger.error("Connection closed while waiting for authorization")
-                raise ConnectionError("Connection closed while waiting for authorization")
+                await self._handle_msg(message)
+        except ConnectionClosed as e:
+            self._logger.error("Connection closed while waiting for authorization")
+            raise ConnectionError("Connection closed while waiting for authorization") from e
+
+        # ClientConnection.__aiter__ stops normally for clean websocket closes.
+        if not authorized:
+            raise ConnectionError("Connection closed while waiting for authorization")
 
         self._logger.info("Authorized successfully, dispatching connect event...")
         await self.bot.dispatch("connect")
