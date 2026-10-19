@@ -1,6 +1,6 @@
 [project]
 name = "osmium-chat"
-version = "0.3.6"
+version = "0.3.7"
 description = "A Python API wrapper for Osmium."
 readme = "README.md"
 license = "MIT"
@@ -8,7 +8,7 @@ authors = [{ name = "abigail phoebe", email = "abigail@phoebe.sh" }]
 requires-python = ">=3.13,<4.0"
 dependencies = [
     "osmium-protos==2.0.2",
-    "websockets>=16.0",
+    "websockets>=17.3",
 ]
 
 [project.urls]
