@@ -3,7 +3,6 @@ from enum import IntFlag
 
 from osmium_protos import PB_PermissionOverrides, PB_TypesChannelOverride
 
-
 __all__: tuple[str, ...] = (
     "PermissionOverrides",
     "ChannelOverride",

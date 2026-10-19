@@ -1,36 +1,36 @@
 import asyncio
-from collections.abc import Coroutine
-from logging import Logger
 import os
 import platform
+from collections.abc import Coroutine
+from logging import Logger
 from typing import TYPE_CHECKING, Any, cast
 
-from osmium_chat import __version__
-
-from websockets.asyncio.client import ClientConnection, connect
-from websockets.exceptions import ConnectionClosed
 from osmium_protos import (
-    PB_FileMetadataMetadataImage,
-    unwrap,
-    wrap,
     PB_AuthAuthorization,
     PB_AuthAuthorize,
     PB_FileMetadata,
     PB_FileMetadataMetadataCustomEmoji,
     PB_FileMetadataMetadataFile,
+    PB_FileMetadataMetadataImage,
     PB_Initialize,
     PB_MediaRef,
     PB_MediaRefUploadedFile,
     PB_RpcResult,
     PB_ServerMessage,
     PB_StickerPackRef,
+    PB_UpdateInteraction,
     PB_UpdateMessageCreated,
     PB_UpdateMessageDeleted,
-    PB_UpdateInteraction,
-    PB_UploadFilePart,
     PB_UploadedFileRef,
+    PB_UploadFilePart,
+    unwrap,
+    wrap,
 )
 from osmium_protos.osmium.client.auth import Authorization
+from websockets.asyncio.client import ClientConnection, connect
+from websockets.exceptions import ConnectionClosed
+
+from osmium_chat import __version__
 from osmium_chat.errors import RequestError
 from osmium_chat.user.user import User
 
@@ -107,11 +107,15 @@ class Client:
                 if button._fixed_id:
                     self._fixed_buttons[button.custom_id] = (button, message)
 
-    def resolve_button(self, message_id: int, custom_id: str | None) -> tuple[Any, Any] | None:
+    def resolve_button(
+        self, message_id: int, custom_id: str | None
+    ) -> tuple[Any, Any] | None:
         """Resolve a button by message-specific id, then by fixed id."""
         if custom_id is None:
             return None
-        return self._buttons_by_message.get((message_id, custom_id)) or self._fixed_buttons.get(custom_id)
+        return self._buttons_by_message.get(
+            (message_id, custom_id)
+        ) or self._fixed_buttons.get(custom_id)
 
     def remove_buttons(self, message_id: int) -> None:
         """Drop button registrations when a message is deleted."""
@@ -121,7 +125,8 @@ class Client:
             if not button._fixed_id:
                 continue
             remaining = [
-                binding for (msg_id, custom_id), binding in self._buttons_by_message.items()
+                binding
+                for (msg_id, custom_id), binding in self._buttons_by_message.items()
                 if custom_id == button.custom_id
             ]
             if remaining:
@@ -190,7 +195,9 @@ class Client:
         if future is None or future.done():
             return False
         if result.error is not None:
-            future.set_exception(RequestError(result.error.error_code, result.error.error_message))
+            future.set_exception(
+                RequestError(result.error.error_code, result.error.error_message)
+            )
         else:
             future.set_result(result)
         return True
@@ -244,7 +251,9 @@ class Client:
         assert self._connection is not None
         self._req_counter += 1
         req_id = self._req_counter
-        future: asyncio.Future[PB_RpcResult] = asyncio.get_running_loop().create_future()
+        future: asyncio.Future[PB_RpcResult] = (
+            asyncio.get_running_loop().create_future()
+        )
         self._pending[req_id] = future
         try:
             await self._connection.send(wrap(payload, id=req_id).SerializeToString())
@@ -290,14 +299,18 @@ class Client:
         """
         upload_id = int.from_bytes(os.urandom(8), "big")
         chunk_size = self._UPLOAD_CHUNK_SIZE
-        parts = [data[i:i + chunk_size] for i in range(0, max(len(data), 1), chunk_size)]
+        parts = [
+            data[i : i + chunk_size] for i in range(0, max(len(data), 1), chunk_size)
+        ]
 
         for index, chunk in enumerate(parts):
-            await self.request(PB_UploadFilePart(
-                upload_id=upload_id,
-                part=index,
-                data=chunk,
-            ))
+            await self.request(
+                PB_UploadFilePart(
+                    upload_id=upload_id,
+                    part=index,
+                    data=chunk,
+                )
+            )
 
         file_ref = PB_UploadedFileRef(
             id=upload_id,
@@ -315,12 +328,14 @@ class Client:
                 image=PB_FileMetadataMetadataImage(animated=animated),
             )
 
-        media_ref = PB_MediaRef(uploaded=PB_MediaRefUploadedFile(
-            file=file_ref,
-            filename=filename,
-            mimetype=mimetype,
-            metadata=metadata,
-        ))
+        media_ref = PB_MediaRef(
+            uploaded=PB_MediaRefUploadedFile(
+                file=file_ref,
+                filename=filename,
+                mimetype=mimetype,
+                metadata=metadata,
+            )
+        )
         return file_ref, media_ref
 
     async def upload_emoji_image(
@@ -348,14 +363,18 @@ class Client:
         """
         upload_id = int.from_bytes(os.urandom(8), "big")
         chunk_size = self._UPLOAD_CHUNK_SIZE
-        parts = [data[i:i + chunk_size] for i in range(0, max(len(data), 1), chunk_size)]
+        parts = [
+            data[i : i + chunk_size] for i in range(0, max(len(data), 1), chunk_size)
+        ]
 
         for index, chunk in enumerate(parts):
-            await self.request(PB_UploadFilePart(
-                upload_id=upload_id,
-                part=index,
-                data=chunk,
-            ))
+            await self.request(
+                PB_UploadFilePart(
+                    upload_id=upload_id,
+                    part=index,
+                    data=chunk,
+                )
+            )
 
         file_ref = PB_UploadedFileRef(
             id=upload_id,
@@ -390,13 +409,15 @@ class Client:
         )
 
         self._logger.info("Connected to WebSocket server, initializing...")
-        await self.send_pb(PB_Initialize(
-            client_id=self.id,
-            device_type="Library[Python/OsmiumChat]",
-            device_version=__version__,
-            app_version=f"OsmiumChat Python API Wrapper (Python {platform.python_version()}) (OsmiumChat {__version__})",
-            no_subscribe=False,
-        ))
+        await self.send_pb(
+            PB_Initialize(
+                client_id=self.id,
+                device_type="Library[Python/OsmiumChat]",
+                device_version=__version__,
+                app_version=f"OsmiumChat Python API Wrapper (Python {platform.python_version()}) (OsmiumChat {__version__})",
+                no_subscribe=False,
+            )
+        )
 
         self._logger.info("Received initialization response, getting entry points...")
 
@@ -404,9 +425,11 @@ class Client:
         await self._connection.recv()
 
         self._logger.info("Received initialization response, sending authorization...")
-        await self.send_pb(PB_AuthAuthorize(
-            token=token,
-        ))
+        await self.send_pb(
+            PB_AuthAuthorize(
+                token=token,
+            )
+        )
 
         # wait for authorization
         # most of the time it is the first or second message, but to be safe we will loop until we get it
@@ -422,7 +445,9 @@ class Client:
                 await self._handle_msg(message)
         except ConnectionClosed as e:
             self._logger.error("Connection closed while waiting for authorization")
-            raise ConnectionError("Connection closed while waiting for authorization") from e
+            raise ConnectionError(
+                "Connection closed while waiting for authorization"
+            ) from e
 
         # ClientConnection.__aiter__ stops normally for clean websocket closes.
         if not authorized:

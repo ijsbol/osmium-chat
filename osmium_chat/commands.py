@@ -128,6 +128,7 @@ _CUSTOM_EMOJI_RE = re.compile(r"^:([^:]+):$")
 
 class CommandRestriction(Enum):
     """Where a command is allowed to be invoked."""
+
     NONE = "none"
     DM_ONLY = "dm_only"
     COMMUNITY_ONLY = "community_only"
@@ -185,7 +186,9 @@ def guild_command(
     aliases: tuple[str, ...] = (),
 ) -> Callable[[CommandCallback], CommandCallback]:
     """Shorthand for ``@command(..., restriction=CommandRestriction.COMMUNITY_ONLY)``."""
-    return command(name=name, aliases=aliases, restriction=CommandRestriction.COMMUNITY_ONLY)
+    return command(
+        name=name, aliases=aliases, restriction=CommandRestriction.COMMUNITY_ONLY
+    )
 
 
 def dm_command(
@@ -204,6 +207,7 @@ def listen(event: str) -> Callable[[CommandCallback], CommandCallback]:
         ``"message"``, ``"guild_message"``, ``"dm_message"``,
         ``"command_error"``).
     """
+
     def decorator(func: CommandCallback) -> CommandCallback:
         func._listen_meta = _ListenMeta(event)  # type: ignore[attr-defined]
         return func
@@ -243,6 +247,7 @@ def _author_user(ctx: "Context") -> "User | None":
 async def _resolve_user(ctx: "Context", value: str, *_: Any) -> User:
     # Strip a leading @ to get either a numeric id or a username.
     from osmium_protos import PB_LookupUsername, PB_User
+
     raw = value.lstrip("@")
     author_user = _author_user(ctx)
     if raw.isdigit():
@@ -261,6 +266,7 @@ async def _resolve_user(ctx: "Context", value: str, *_: Any) -> User:
 
 async def _resolve_member(ctx: "Context", value: str, *_: Any) -> Member:
     from osmium_protos import PB_GetMembers, PB_LookupUsername, PB_User
+
     if ctx.community is None:
         raise ValueError(value)
     raw = value.lstrip("@")
@@ -295,7 +301,11 @@ async def _resolve_role(ctx: "Context", value: str, *_: Any) -> Role:
     key = m.group(1) if m else value
     if ctx.community is None:
         raise ValueError(value)
-    roles = ctx.community.roles if ctx.community.roles else await ctx.community.fetch_roles()
+    roles = (
+        ctx.community.roles
+        if ctx.community.roles
+        else await ctx.community.fetch_roles()
+    )
     if key.isdigit():
         role_id = int(key)
         role = next((r for r in roles if r.id == role_id), None)
@@ -317,7 +327,11 @@ async def _resolve_channel(ctx: "Context", value: str, *_: Any) -> Channel:
     key = m.group(1) if m else value
     if ctx.community is None:
         raise ValueError(value)
-    channels = ctx.community.channels if ctx.community.channels else await ctx.community.fetch_channels()
+    channels = (
+        ctx.community.channels
+        if ctx.community.channels
+        else await ctx.community.fetch_channels()
+    )
     if key.isdigit():
         channel_id = int(key)
         channel = next((c for c in channels if c.id == channel_id), None)
@@ -343,27 +357,39 @@ async def _resolve_category(ctx: "Context", value: str, *_: Any) -> Category:
         await ctx.community.fetch_channels()
     if key.isdigit():
         category_id = int(key)
-        category = next((c for c in ctx.community.categories if c.id == category_id), None)
+        category = next(
+            (c for c in ctx.community.categories if c.id == category_id), None
+        )
         if category is None:
             await ctx.community.fetch_channels()
-            category = next((c for c in ctx.community.categories if c.id == category_id), None)
+            category = next(
+                (c for c in ctx.community.categories if c.id == category_id), None
+            )
     else:
         category = next((c for c in ctx.community.categories if c.name == key), None)
         if category is None:
             await ctx.community.fetch_channels()
-            category = next((c for c in ctx.community.categories if c.name == key), None)
+            category = next(
+                (c for c in ctx.community.categories if c.name == key), None
+            )
     if category is None:
         raise ValueError(value)
     return category
 
 
-async def _resolve_custom_emoji(ctx: "Context", value: str, entity: Any = None) -> CustomEmoji:
+async def _resolve_custom_emoji(
+    ctx: "Context", value: str, entity: Any = None
+) -> CustomEmoji:
     if ctx.community is None:
         raise ValueError(value)
     # Entity path: emoji_id is authoritative — no name lookup needed.
     if entity is not None and entity.custom_emoji is not None:
         emoji_id = entity.custom_emoji.emoji_id
-        emojis = ctx.community.custom_emojis if ctx.community.custom_emojis else await ctx.community.fetch_custom_emojis()
+        emojis = (
+            ctx.community.custom_emojis
+            if ctx.community.custom_emojis
+            else await ctx.community.fetch_custom_emojis()
+        )
         emoji = next((e for e in emojis if e.id == emoji_id), None)
         if emoji is None:
             emojis = await ctx.community.fetch_custom_emojis()
@@ -384,7 +410,11 @@ async def _resolve_custom_emoji(ctx: "Context", value: str, entity: Any = None) 
     if not m:
         raise ValueError(value)
     name = m.group(1)
-    emojis = ctx.community.custom_emojis if ctx.community.custom_emojis else await ctx.community.fetch_custom_emojis()
+    emojis = (
+        ctx.community.custom_emojis
+        if ctx.community.custom_emojis
+        else await ctx.community.fetch_custom_emojis()
+    )
     emoji = next((e for e in emojis if e.name == name), None)
     if emoji is None:
         emojis = await ctx.community.fetch_custom_emojis()
@@ -458,7 +488,7 @@ class StringView:
     def rest(self) -> str:
         """Consume and return the remaining string, stripped of surrounding space."""
         self.skip_whitespace()
-        remaining = self.text[self.index:]
+        remaining = self.text[self.index :]
         self.index = len(self.text)
         return remaining.strip()
 
@@ -484,7 +514,7 @@ class StringView:
         start = self.index
         while not self.eof and not self.text[self.index].isspace():
             self.index += 1
-        return self.text[start:self.index]
+        return self.text[start : self.index]
 
     def _read_quoted(self, quote: str) -> str:
         """Read a quoted word starting at the opening ``quote`` character."""
@@ -740,9 +770,7 @@ class Command:
         for index, param in enumerate(signature.parameters.values()):
             if index == 0:
                 continue  # the context parameter
-            if param.kind in (
-                inspect.Parameter.VAR_KEYWORD,
-            ):
+            if param.kind in (inspect.Parameter.VAR_KEYWORD,):
                 continue  # **kwargs is not fed from the message
             raw = hints.get(param.name, param.annotation)
             annotation, _ = _resolve_annotation(raw)
@@ -771,6 +799,7 @@ class Command:
         :raises BadArgument: If an argument fails type conversion.
         :raises TooManyArguments: If unconsumed tokens remain at the end.
         """
+
         def _entity_at(word_start: int) -> Any:
             utf16_pos = prefix_utf16 + _utf16_len(view.text[:word_start])
             return entity_by_pos.get(utf16_pos)
@@ -784,7 +813,11 @@ class Command:
                     word = view.get_word()
                     if word is None:
                         break
-                    args.append(await param.resolve(ctx, word, entity=_entity_at(view.word_start)))
+                    args.append(
+                        await param.resolve(
+                            ctx, word, entity=_entity_at(view.word_start)
+                        )
+                    )
                 return args, kwargs
 
             if param.kind is inspect.Parameter.KEYWORD_ONLY:
@@ -796,7 +829,9 @@ class Command:
                         raise MissingRequiredArgument(param.name)
                     kwargs[param.name] = param.default
                 else:
-                    kwargs[param.name] = await param.resolve(ctx, remaining, entity=None)
+                    kwargs[param.name] = await param.resolve(
+                        ctx, remaining, entity=None
+                    )
                 return args, kwargs
 
             word = view.get_word()
@@ -805,7 +840,9 @@ class Command:
                     raise MissingRequiredArgument(param.name)
                 args.append(param.default)
             else:
-                args.append(await param.resolve(ctx, word, entity=_entity_at(view.word_start)))
+                args.append(
+                    await param.resolve(ctx, word, entity=_entity_at(view.word_start))
+                )
 
         leftover = view.rest()
         if leftover:
@@ -822,7 +859,9 @@ class Command:
         entity_by_pos: dict[int, Any] = {
             e.start_index: e for e in ctx.message.content_raw.entities
         }
-        args, kwargs = await self.parse_arguments(ctx, view, entity_by_pos, prefix_utf16)
+        args, kwargs = await self.parse_arguments(
+            ctx, view, entity_by_pos, prefix_utf16
+        )
         ctx.command = self
         ctx.args = args
         await self.callback(ctx, *args, **kwargs)

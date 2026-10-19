@@ -1,6 +1,28 @@
 import asyncio
 from types import SimpleNamespace
 
+from osmium_protos import (
+    PB_Channel,
+    PB_ChannelRef,
+    PB_ChatPhoto,
+    PB_ChatRef,
+    PB_FileMetadata,
+    PB_FileMetadataMetadataFile,
+    PB_FileMetadataMetadataImage,
+    PB_MediaEmbed,
+    PB_Message,
+    PB_MessageMedia,
+    PB_MessageMessageBotInfo,
+    PB_MessageMessageBotInfoMessageCloak,
+    PB_MessageMessageForwardInfo,
+    PB_MessageMessageReplyInfo,
+    PB_MessageMessageReplyInfoQuote,
+    PB_RpcResult,
+    PB_SentMessage,
+    PB_UpdateInteraction,
+    PB_UserRef,
+)
+
 from osmium_chat import (
     Bot,
     Button,
@@ -12,27 +34,6 @@ from osmium_chat import (
 )
 from osmium_chat.file import FileMetadata
 from osmium_chat.message import Message
-from osmium_protos import (
-    PB_ChatPhoto,
-    PB_ChatRef,
-    PB_Channel,
-    PB_ChannelRef,
-    PB_FileMetadata,
-    PB_FileMetadataMetadataFile,
-    PB_FileMetadataMetadataImage,
-    PB_Message,
-    PB_MessageMedia,
-    PB_MessageMessageBotInfo,
-    PB_MessageMessageBotInfoMessageCloak,
-    PB_MessageMessageForwardInfo,
-    PB_MessageMessageReplyInfo,
-    PB_MessageMessageReplyInfoQuote,
-    PB_MediaEmbed,
-    PB_RpcResult,
-    PB_SentMessage,
-    PB_UpdateInteraction,
-    PB_UserRef,
-)
 
 
 class FakeClient:
@@ -132,18 +133,22 @@ def test_button_routing_prefers_instance_callback() -> None:
             calls.append(("global", interaction.data))
 
         bot._listeners["interaction"] = [global_handler]
-        await bot.process_interaction(PB_UpdateInteraction(
-            interaction_id=1,
-            user_id=2,
-            message_id=42,
-            data=button.custom_id,
-        ))
-        await bot.process_interaction(PB_UpdateInteraction(
-            interaction_id=2,
-            user_id=2,
-            message_id=43,
-            data="unknown",
-        ))
+        await bot.process_interaction(
+            PB_UpdateInteraction(
+                interaction_id=1,
+                user_id=2,
+                message_id=42,
+                data=button.custom_id,
+            )
+        )
+        await bot.process_interaction(
+            PB_UpdateInteraction(
+                interaction_id=2,
+                user_id=2,
+                message_id=43,
+                data="unknown",
+            )
+        )
         assert calls[0] == ("button", button.custom_id)
         assert calls[1] == ("global", "unknown")
 

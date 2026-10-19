@@ -17,7 +17,6 @@ from osmium_chat import Bot, Context, commands
 from osmium_chat.content import Content
 from osmium_chat.emoji import CustomEmoji
 
-
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
 _handler = StreamHandler()
@@ -64,7 +63,9 @@ class EmojiCommands(commands.Commands):
         await ctx.reply(f"Deleted :{emoji.name}:.")
 
     @commands.command("renameemoji")
-    async def renameemoji(self, ctx: Context, emoji: CustomEmoji, new_name: str) -> None:
+    async def renameemoji(
+        self, ctx: Context, emoji: CustomEmoji, new_name: str
+    ) -> None:
         old_name = emoji.name
         emoji.rename(new_name)
         await ctx.reply(f"Renamed :{old_name}: → :{new_name}: (local only).")

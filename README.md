@@ -53,10 +53,12 @@ bot.run(token="YOUR_TOKEN")
 ```python
 from osmium_chat.content import Bold, CodeBlock, Content, Italic, Spoiler, TextUrl
 
-await ctx.channel.send(Content(
-    f"Hello, {Bold('world')}! ",
-    TextUrl("osmium.chat", url="https://osmium.chat"),
-))
+await ctx.channel.send(
+    Content(
+        f"Hello, {Bold('world')}! ",
+        TextUrl("osmium.chat", url="https://osmium.chat"),
+    )
+)
 ```
 
 ---

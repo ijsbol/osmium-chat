@@ -50,15 +50,13 @@ from osmium_protos import (
     PB_StickerPackRef,
 )
 
-from osmium_chat.content import _FormattingNode, _expand
+from osmium_chat.content import _expand, _FormattingNode
 
 if TYPE_CHECKING:
     from osmium_chat.client import Client
 
 
-__all__: tuple[str, ...] = (
-    "CustomEmoji",
-)
+__all__: tuple[str, ...] = ("CustomEmoji",)
 
 
 class CustomEmoji(_FormattingNode):
@@ -109,10 +107,12 @@ class CustomEmoji(_FormattingNode):
 
         :raises RequestError: If the gateway rejects the request.
         """
-        await self._client.send_pb(PB_RemoveStickerFromPack(
-            pack=PB_StickerPackRef(id=self._pack_id),
-            sticker_id=self.id,
-        ))
+        await self._client.send_pb(
+            PB_RemoveStickerFromPack(
+                pack=PB_StickerPackRef(id=self._pack_id),
+                sticker_id=self.id,
+            )
+        )
 
     def rename(self, name: str) -> "CustomEmoji":
         """Update this emoji's local display name.

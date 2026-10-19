@@ -2,7 +2,6 @@ from enum import IntEnum
 
 from osmium_protos import PB_UserStatusActivity
 
-
 __all__: tuple[str, ...] = (
     "UserActivityType",
     "UserStatusActivity",

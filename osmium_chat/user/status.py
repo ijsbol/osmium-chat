@@ -4,7 +4,6 @@ from osmium_protos import PB_UserStatus
 
 from osmium_chat.user.activity import UserStatusActivity
 
-
 __all__: tuple[str, ...] = (
     "UserStatusStatus",
     "UserStatus",
@@ -40,4 +39,6 @@ class UserStatus:
             UserStatusStatus.ONLINE,
             UserStatusStatus.IDLE,
         )
-        self.activities: list[UserStatusActivity] = [UserStatusActivity(activity) for activity in status.activities]
+        self.activities: list[UserStatusActivity] = [
+            UserStatusActivity(activity) for activity in status.activities
+        ]

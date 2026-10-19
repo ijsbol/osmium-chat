@@ -17,9 +17,7 @@ if TYPE_CHECKING:
     from osmium_chat.role import Role
 
 
-__all__: tuple[str, ...] = (
-    "Member",
-)
+__all__: tuple[str, ...] = ("Member",)
 
 
 class Member(User):
@@ -92,11 +90,13 @@ class Member(User):
         if role.id in self.role_ids:
             return
         new_ids = self.role_ids + [role.id]
-        await self._client.request(PB_EditMember(
-            community_id=self.community.id,
-            member_id=self.id,
-            role_ids=PB_CommunityMemberRoleIds(role_ids=new_ids),
-        ))
+        await self._client.request(
+            PB_EditMember(
+                community_id=self.community.id,
+                member_id=self.id,
+                role_ids=PB_CommunityMemberRoleIds(role_ids=new_ids),
+            )
+        )
         self.role_ids = new_ids
 
     async def remove_role(self, role: "Role") -> None:
@@ -111,9 +111,11 @@ class Member(User):
         if role.id not in self.role_ids:
             return
         new_ids = [r for r in self.role_ids if r != role.id]
-        await self._client.request(PB_EditMember(
-            community_id=self.community.id,
-            member_id=self.id,
-            role_ids=PB_CommunityMemberRoleIds(role_ids=new_ids),
-        ))
+        await self._client.request(
+            PB_EditMember(
+                community_id=self.community.id,
+                member_id=self.id,
+                role_ids=PB_CommunityMemberRoleIds(role_ids=new_ids),
+            )
+        )
         self.role_ids = new_ids

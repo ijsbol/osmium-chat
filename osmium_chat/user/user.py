@@ -11,9 +11,7 @@ if TYPE_CHECKING:
     from osmium_chat.client import Client
 
 
-__all__: tuple[str, ...] = (
-    "User",
-)
+__all__: tuple[str, ...] = ("User",)
 
 
 class User:
@@ -65,10 +63,12 @@ class User:
         :returns: The fetched :class:`Profile`.
         :raises RequestError: If the gateway rejects the request.
         """
-        result = await self._client.request(PB_GetProfile(
-            ref=PB_UserRef(user_id=self.id),
-            include_mutuals=include_mutuals,
-        ))
+        result = await self._client.request(
+            PB_GetProfile(
+                ref=PB_UserRef(user_id=self.id),
+                include_mutuals=include_mutuals,
+            )
+        )
         assert result.profile is not None
         self.profile = Profile(result.profile, self._client)
         return self.profile

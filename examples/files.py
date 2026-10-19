@@ -14,7 +14,6 @@ from logging import DEBUG, Formatter, StreamHandler, getLogger
 
 from osmium_chat import Bot, Context, commands
 
-
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
 _handler = StreamHandler()
@@ -30,7 +29,9 @@ class FileCommands(commands.Commands):
         logger.info("Bot connected")
 
     @commands.command("sendtext")
-    async def sendtext(self, ctx: Context, *, words: str = "Hello from osmium-py!") -> None:
+    async def sendtext(
+        self, ctx: Context, *, words: str = "Hello from osmium-py!"
+    ) -> None:
         data = words.encode()
         await ctx.channel.send_file(data, "message.txt", mimetype="text/plain")
 
@@ -60,7 +61,9 @@ class FileCommands(commands.Commands):
         f = attachments[0]
         data = await f.download()
         name = f.filename or "file"
-        await ctx.reply(f"{name} ({len(data)} bytes):\n{data.decode(errors='replace')[:500]}")
+        await ctx.reply(
+            f"{name} ({len(data)} bytes):\n{data.decode(errors='replace')[:500]}"
+        )
 
     @commands.command("savefile")
     async def savefile(self, ctx: Context, *, dest: str = ".") -> None:

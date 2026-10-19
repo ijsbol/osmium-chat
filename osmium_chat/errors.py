@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 __all__: tuple[str, ...] = (
     "OsmiumChatError",
     "RequestError",
@@ -60,7 +59,9 @@ class CommandRestrictionError(CommandError):
         """
         self.name = name
         self.restriction = restriction
-        super().__init__(f"Command {name!r} cannot be used here (restriction: {restriction.value})")
+        super().__init__(
+            f"Command {name!r} cannot be used here (restriction: {restriction.value})"
+        )
 
 
 class ArgumentError(CommandError):

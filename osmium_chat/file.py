@@ -80,18 +80,23 @@ class FileMetadata:
                 metadata.image.height,
                 metadata.image.preview,
                 metadata.image.animated,
-            ) if metadata.image is not None else None
+            )
+            if metadata.image is not None
+            else None
         )
         self.video = (
             VideoMetadata(
                 metadata.video.width,
                 metadata.video.height,
                 metadata.video.duration,
-            ) if metadata.video is not None else None
+            )
+            if metadata.video is not None
+            else None
         )
         self.audio = (
             AudioMetadata(metadata.audio.duration)
-            if metadata.audio is not None else None
+            if metadata.audio is not None
+            else None
         )
         self.file: FileMarkerMetadata | None = (
             FileMarkerMetadata() if metadata.file is not None else None
@@ -102,9 +107,12 @@ class FileMetadata:
                 metadata.custom_emoji.height,
                 metadata.custom_emoji.emoji,
                 metadata.custom_emoji.pack.id
-                if metadata.custom_emoji.pack is not None else None,
+                if metadata.custom_emoji.pack is not None
+                else None,
                 metadata.custom_emoji.animated,
-            ) if metadata.custom_emoji is not None else None
+            )
+            if metadata.custom_emoji is not None
+            else None
         )
 
     @property
@@ -178,11 +186,13 @@ class File:
         offset = 0
         while offset < self.size:
             length = min(_DOWNLOAD_CHUNK_SIZE, self.size - offset)
-            result = await self._client.request(PB_DownloadFilePart(
-                file_ref=file_ref,
-                offset=offset,
-                length=length,
-            ))
+            result = await self._client.request(
+                PB_DownloadFilePart(
+                    file_ref=file_ref,
+                    offset=offset,
+                    length=length,
+                )
+            )
             part = result.file_part
             if part is None or not part.data:
                 break

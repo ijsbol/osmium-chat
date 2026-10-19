@@ -42,9 +42,7 @@ if TYPE_CHECKING:
     from osmium_chat.emoji import CustomEmoji
 
 
-__all__: tuple[str, ...] = (
-    "Reaction",
-)
+__all__: tuple[str, ...] = ("Reaction",)
 
 
 class Reaction:
@@ -92,6 +90,7 @@ def _reaction_from_field(
     pb_emoji = field.emoji
     if pb_emoji is not None and pb_emoji.custom_emoji is not None:
         from osmium_chat.emoji import CustomEmoji
+
         emoji: "CustomEmoji | UnicodeEmoji" = CustomEmoji(
             emoji_id=pb_emoji.custom_emoji,
             name=str(pb_emoji.custom_emoji),

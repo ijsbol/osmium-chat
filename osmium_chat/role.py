@@ -10,9 +10,7 @@ if TYPE_CHECKING:
     from osmium_chat.client import Client
 
 
-__all__: tuple[str, ...] = (
-    "Role",
-)
+__all__: tuple[str, ...] = ("Role",)
 
 
 class Role:
@@ -89,21 +87,25 @@ class Role:
         if public is not None:
             self.public = public
 
-        await self._client.request(PB_EditRole(
-            id=self.id,
-            community_id=self.community_id,
-            name=self.name,
-            permissions=int(self.permissions),
-            priority=self.priority,
-            color=self.color,
-            separated=self.separated,
-            public=self.public,
-        ))
+        await self._client.request(
+            PB_EditRole(
+                id=self.id,
+                community_id=self.community_id,
+                name=self.name,
+                permissions=int(self.permissions),
+                priority=self.priority,
+                color=self.color,
+                separated=self.separated,
+                public=self.public,
+            )
+        )
         return self
 
     async def delete(self) -> None:
         """Delete this role from its community."""
-        await self._client.send_pb(PB_DeleteRole(
-            id=self.id,
-            community_id=self.community_id,
-        ))
+        await self._client.send_pb(
+            PB_DeleteRole(
+                id=self.id,
+                community_id=self.community_id,
+            )
+        )

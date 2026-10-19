@@ -47,6 +47,7 @@ __all__: tuple[str, ...] = (
     "plain_text",
 )
 
+
 class UnicodeEmoji:
     """A standard Unicode emoji for use in :class:`Content`.
 

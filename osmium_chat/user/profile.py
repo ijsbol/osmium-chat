@@ -8,9 +8,7 @@ if TYPE_CHECKING:
     from osmium_chat.client import Client
 
 
-__all__: tuple[str, ...] = (
-    "Profile",
-)
+__all__: tuple[str, ...] = ("Profile",)
 
 
 class Profile:

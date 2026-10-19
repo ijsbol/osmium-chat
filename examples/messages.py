@@ -15,9 +15,16 @@ from asyncio import run
 from logging import DEBUG, Formatter, StreamHandler, getLogger
 
 from osmium_chat import Bot, Context, commands
-from osmium_chat.content import Bold, Code, CodeBlock, Content, Italic, Strikethrough, Underline
+from osmium_chat.content import (
+    Bold,
+    Code,
+    CodeBlock,
+    Content,
+    Italic,
+    Strikethrough,
+    Underline,
+)
 from osmium_chat.mentions import UserMention
-
 
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
@@ -39,14 +46,18 @@ class MessageCommands(commands.Commands):
 
     @commands.command("markdowntest")
     async def markdowntest(self, ctx: Context) -> None:
-        await ctx.channel.send(Content(
-            "Hello", Bold("world"), Italic("italic"),
-            Code("code"),
-            CodeBlock("code block"),
-            Strikethrough("strikethrough"),
-            Underline("underline"),
-            Underline(Bold(Italic(f"combined {Strikethrough('formatting')}"))),
-        ))
+        await ctx.channel.send(
+            Content(
+                "Hello",
+                Bold("world"),
+                Italic("italic"),
+                Code("code"),
+                CodeBlock("code block"),
+                Strikethrough("strikethrough"),
+                Underline("underline"),
+                Underline(Bold(Italic(f"combined {Strikethrough('formatting')}"))),
+            )
+        )
 
     @commands.command("editmsg")
     async def editmsg(self, ctx: Context) -> None:

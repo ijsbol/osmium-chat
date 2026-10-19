@@ -22,7 +22,6 @@ from osmium_chat.mentions import UserMention
 from osmium_chat.role import Role
 from osmium_chat.user.user import User
 
-
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
 _handler = StreamHandler()

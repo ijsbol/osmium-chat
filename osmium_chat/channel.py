@@ -1,8 +1,6 @@
-from enum import IntEnum, IntFlag
 from collections.abc import Sequence
+from enum import IntEnum, IntFlag
 from typing import TYPE_CHECKING
-
-from osmium_chat.content import Content
 
 from osmium_protos import (
     PB_AddChatMember,
@@ -31,6 +29,7 @@ from osmium_protos import (
     PB_SyncChannelOverrides,
 )
 
+from osmium_chat.content import Content
 from osmium_chat.message_options import (
     MessageCloak,
     MessageQuote,
@@ -40,14 +39,18 @@ from osmium_chat.message_options import (
 )
 
 if TYPE_CHECKING:
+    from osmium_chat.button import Button
     from osmium_chat.category import Category
+    from osmium_chat.chat_member import ChatMember
     from osmium_chat.client import Client
     from osmium_chat.community import Community
     from osmium_chat.invite import InvitePreview
     from osmium_chat.message import Message
-    from osmium_chat.chat_member import ChatMember
-    from osmium_chat.button import Button
-    from osmium_chat.permissions import ChannelOverride, ChannelOverrides, CommunityPermission
+    from osmium_chat.permissions import (
+        ChannelOverride,
+        ChannelOverrides,
+        CommunityPermission,
+    )
     from osmium_chat.role import Role
     from osmium_chat.user.user import User
 
@@ -169,10 +172,12 @@ class Channel:
         :param client: The client used to deliver messages and edits.
         """
         return cls(
-            PB_ChatRef(channel=PB_ChannelRef(
-                community_id=channel.community_id,
-                channel_id=channel.id,
-            )),
+            PB_ChatRef(
+                channel=PB_ChannelRef(
+                    community_id=channel.community_id,
+                    channel_id=channel.id,
+                )
+            ),
             client,
             id=channel.id,
             name=channel.name,
@@ -225,15 +230,17 @@ class Channel:
         from osmium_chat.message import Message
 
         content_obj = content if isinstance(content, Content) else Content(content)
-        result = await self._client.request(PB_SendMessage(
-            chat_ref=self._chat_ref,
-            message=content_obj.text,
-            entities=content_obj.entities,
-            reply_to=make_send_reply_to(reply_to, quote),
-            suppress_embeds=suppress_embeds,
-            bot_info=make_bot_info(cloak, buttons),
-            client_id=client_id,
-        ))
+        result = await self._client.request(
+            PB_SendMessage(
+                chat_ref=self._chat_ref,
+                message=content_obj.text,
+                entities=content_obj.entities,
+                reply_to=make_send_reply_to(reply_to, quote),
+                suppress_embeds=suppress_embeds,
+                bot_info=make_bot_info(cloak, buttons),
+                client_id=client_id,
+            )
+        )
         author = self._client.bot.user
         sent = result.sent_message
         return Message(
@@ -286,14 +293,16 @@ class Channel:
             send_as_file=send_as_file,
             animated=animated,
         )
-        result = await self._client.request(PB_SendMessage(
-            chat_ref=self._chat_ref,
-            media=[media_ref],
-            reply_to=make_send_reply_to(reply_to, quote),
-            suppress_embeds=suppress_embeds,
-            bot_info=make_bot_info(cloak, buttons),
-            client_id=client_id,
-        ))
+        result = await self._client.request(
+            PB_SendMessage(
+                chat_ref=self._chat_ref,
+                media=[media_ref],
+                reply_to=make_send_reply_to(reply_to, quote),
+                suppress_embeds=suppress_embeds,
+                bot_info=make_bot_info(cloak, buttons),
+                client_id=client_id,
+            )
+        )
         author = self._client.bot.user
         sent = result.sent_message
         return Message(
@@ -337,21 +346,24 @@ class Channel:
         :raises RequestError: If the gateway rejects the edit.
         """
         ref = self._channel_ref
-        await self._client.request(PB_EditChannel(
-            channel=ref,
-            name=name,
-            position=position,
-            parent_id=parent_id,
-            explicit=explicit,
-            highlighted_msg_id=(
-                PB_EditChannelHighlightedMessage(
-                    highlighted_msg_id=highlighted_message_id,
-                )
-                if highlighted_message_id is not None else None
-            ),
-            description=description,
-            slowmode_seconds=slowmode_seconds,
-        ))
+        await self._client.request(
+            PB_EditChannel(
+                channel=ref,
+                name=name,
+                position=position,
+                parent_id=parent_id,
+                explicit=explicit,
+                highlighted_msg_id=(
+                    PB_EditChannelHighlightedMessage(
+                        highlighted_msg_id=highlighted_message_id,
+                    )
+                    if highlighted_message_id is not None
+                    else None
+                ),
+                description=description,
+                slowmode_seconds=slowmode_seconds,
+            )
+        )
         if name is not None:
             self.name = name
         if position is not None:
@@ -380,10 +392,12 @@ class Channel:
     async def fetch_overrides(self) -> "ChannelOverrides":
         """Fetch role permission overrides and parent-sync state."""
         ref = self._channel_ref
-        result = await self._client.request(PB_GetChannelOverrides(
-            community_id=ref.community_id,
-            channel_id=ref.channel_id,
-        ))
+        result = await self._client.request(
+            PB_GetChannelOverrides(
+                community_id=ref.community_id,
+                channel_id=ref.channel_id,
+            )
+        )
         from osmium_chat.permissions import ChannelOverride, ChannelOverrides
 
         payload = result.channel_overrides
@@ -397,10 +411,12 @@ class Channel:
     async def sync_overrides(self) -> None:
         """Make this channel inherit permission overrides from its parent."""
         ref = self._channel_ref
-        await self._client.request(PB_SyncChannelOverrides(
-            community_id=ref.community_id,
-            channel_id=ref.channel_id,
-        ))
+        await self._client.request(
+            PB_SyncChannelOverrides(
+                community_id=ref.community_id,
+                channel_id=ref.channel_id,
+            )
+        )
 
     async def create_override(
         self,
@@ -418,12 +434,14 @@ class Channel:
             if permissions is not None
             else PB_PermissionOverrides(pos=int(allow), neg=int(deny))
         )
-        result = await self._client.request(PB_CreateChannelOverride(
-            community_id=ref.community_id,
-            channel_id=ref.channel_id,
-            role_id=role_id,
-            permissions=wire_permissions,
-        ))
+        result = await self._client.request(
+            PB_CreateChannelOverride(
+                community_id=ref.community_id,
+                channel_id=ref.channel_id,
+                role_id=role_id,
+                permissions=wire_permissions,
+            )
+        )
         from osmium_chat.permissions import ChannelOverride
 
         wrapper = result.channel_override
@@ -435,36 +453,44 @@ class Channel:
         """Delete a role override from this channel."""
         ref = self._channel_ref
         role_id = role if isinstance(role, int) else role.id
-        await self._client.request(PB_DeleteChannelOverride(
-            community_id=ref.community_id,
-            channel_id=ref.channel_id,
-            role_id=role_id,
-        ))
+        await self._client.request(
+            PB_DeleteChannelOverride(
+                community_id=ref.community_id,
+                channel_id=ref.channel_id,
+                role_id=role_id,
+            )
+        )
 
     async def add_member(self, user: "User | int") -> None:
         """Add a user to a group chat addressed by this channel."""
         user_id = user if isinstance(user, int) else user.id
-        await self._client.request(PB_AddChatMember(
-            chat_ref=self._chat_ref,
-            user_id=user_id,
-        ))
+        await self._client.request(
+            PB_AddChatMember(
+                chat_ref=self._chat_ref,
+                user_id=user_id,
+            )
+        )
 
     async def remove_member(self, user: "User | int") -> None:
         """Remove a user from this chat."""
         user_id = user if isinstance(user, int) else user.id
-        await self._client.request(PB_RemoveChatMember(
-            chat_ref=self._chat_ref,
-            user_id=user_id,
-        ))
+        await self._client.request(
+            PB_RemoveChatMember(
+                chat_ref=self._chat_ref,
+                user_id=user_id,
+            )
+        )
 
     async def edit_member(self, user: "User | int", permissions: int) -> None:
         """Replace a user's permissions in this chat."""
         user_id = user if isinstance(user, int) else user.id
-        await self._client.request(PB_EditChatMember(
-            chat_ref=self._chat_ref,
-            user_id=user_id,
-            permissions=permissions,
-        ))
+        await self._client.request(
+            PB_EditChatMember(
+                chat_ref=self._chat_ref,
+                user_id=user_id,
+                permissions=permissions,
+            )
+        )
 
     async def fetch_members(self) -> "list[ChatMember]":
         """Fetch members for either a group chat or a community channel."""
@@ -473,36 +499,45 @@ class Channel:
 
         if self._chat_ref.channel is not None:
             ref = self._channel_ref
-            result = await self._client.request(PB_GetChannelMembers(
-                community_id=ref.community_id,
-                channel_id=ref.channel_id,
-            ))
+            result = await self._client.request(
+                PB_GetChannelMembers(
+                    community_id=ref.community_id,
+                    channel_id=ref.channel_id,
+                )
+            )
             payload: PB_MemberList | None = result.member_list
             members: list[ChatMember] = []
             if payload is not None:
                 for entry in payload.entries:
                     if entry.user is None or entry.user.user is None:
                         continue
-                    members.append(ChatMember(
-                        User(entry.user.user, self._client),
-                        self._client,
-                        nickname=entry.user.nickname,
-                        channel=self,
-                    ))
+                    members.append(
+                        ChatMember(
+                            User(entry.user.user, self._client),
+                            self._client,
+                            nickname=entry.user.nickname,
+                            channel=self,
+                        )
+                    )
         else:
-            result = await self._client.request(PB_GetChatMembers(
-                chat_ref=self._chat_ref,
-            ))
+            result = await self._client.request(
+                PB_GetChatMembers(
+                    chat_ref=self._chat_ref,
+                )
+            )
             payload = result.chat_members
             members = []
             if payload is not None:
                 users = {user.id: user for user in payload.users}
-                members = [ChatMember.from_pb(
-                    member,
-                    users.get(member.user_id),
-                    self._client,
-                    channel=self,
-                ) for member in payload.members]
+                members = [
+                    ChatMember.from_pb(
+                        member,
+                        users.get(member.user_id),
+                        self._client,
+                        channel=self,
+                    )
+                    for member in payload.members
+                ]
         self.members = members
         return members
 
@@ -524,11 +559,13 @@ class Channel:
         """
         from osmium_chat.invite import InvitePreview
 
-        result = await self._client.request(PB_CreateChatInvite(
-            chat_ref=self._chat_ref,
-            expires_at=expires_at,
-            max_uses=max_uses,
-        ))
+        result = await self._client.request(
+            PB_CreateChatInvite(
+                chat_ref=self._chat_ref,
+                expires_at=expires_at,
+                max_uses=max_uses,
+            )
+        )
         created = result.created_invite
         if created is None:
             raise RuntimeError("Gateway did not return a created invite")
@@ -546,9 +583,7 @@ class Channel:
         """
         from osmium_chat.invite import InvitePreview
 
-        result = await self._client.request(
-            PB_ListChatInvites(chat_ref=self._chat_ref)
-        )
+        result = await self._client.request(PB_ListChatInvites(chat_ref=self._chat_ref))
         invite_list = result.invite_list
         if invite_list is None:
             return []

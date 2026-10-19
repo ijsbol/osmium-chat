@@ -43,7 +43,9 @@ class Interaction:
 
     async def respond(self, message: str | None = None) -> None:
         """Acknowledge the interaction with an optional ephemeral message."""
-        await self._client.request(PB_SetInteractionResponse(
-            interaction_id=self.id,
-            message=message,
-        ))
+        await self._client.request(
+            PB_SetInteractionResponse(
+                interaction_id=self.id,
+                message=message,
+            )
+        )

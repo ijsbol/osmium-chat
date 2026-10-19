@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from osmium_protos import PB_File, PB_MessageMedia, PB_MediaEmbed
+from osmium_protos import PB_File, PB_MediaEmbed, PB_MessageMedia
 
 from osmium_chat.file import File
 

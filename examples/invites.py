@@ -13,7 +13,6 @@ from logging import DEBUG, Formatter, StreamHandler, getLogger
 
 from osmium_chat import Bot, Context, commands
 
-
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
 _handler = StreamHandler()

@@ -16,7 +16,6 @@ from osmium_chat import Bot, Context, commands
 from osmium_chat.member import Member
 from osmium_chat.role import Role
 
-
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
 _handler = StreamHandler()
@@ -62,7 +61,9 @@ class RoleCommands(commands.Commands):
         if not roles:
             await ctx.reply(f"{member.display_name} has no roles.")
             return
-        await ctx.reply(f"{member.display_name}'s roles: " + ", ".join(r.name for r in roles))
+        await ctx.reply(
+            f"{member.display_name}'s roles: " + ", ".join(r.name for r in roles)
+        )
 
     @commands.guild_command("addrole")
     async def addrole(self, ctx: Context, member: Member, role: Role) -> None:

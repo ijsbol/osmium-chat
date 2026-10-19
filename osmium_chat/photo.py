@@ -11,9 +11,7 @@ if TYPE_CHECKING:
     from osmium_chat.client import Client
 
 
-__all__: tuple[str, ...] = (
-    "Photo",
-)
+__all__: tuple[str, ...] = ("Photo",)
 
 # 1 MiB per download request.
 _DOWNLOAD_CHUNK_SIZE: int = 1024 * 1024
@@ -27,9 +25,7 @@ class _PhotoDownload:
     full photo :class:`bytes`.
     """
 
-    __slots__: tuple[str, ...] = (
-        "_coro",
-    )
+    __slots__: tuple[str, ...] = ("_coro",)
 
     def __init__(self, coro: "Coroutine[Any, Any, bytes]") -> None:
         self._coro = coro
@@ -84,15 +80,19 @@ class Photo:
         reassemble them in order, stopping once a short or empty part signals
         the end of the file.
         """
-        file_ref = PB_FileRef(chat_photo=PB_FileRefChatPhotoFileRef(file_id=self.file_id))
+        file_ref = PB_FileRef(
+            chat_photo=PB_FileRefChatPhotoFileRef(file_id=self.file_id)
+        )
         chunks: list[bytes] = []
         offset = 0
         while True:
-            result = await self._client.request(PB_DownloadFilePart(
-                file_ref=file_ref,
-                offset=offset,
-                length=_DOWNLOAD_CHUNK_SIZE,
-            ))
+            result = await self._client.request(
+                PB_DownloadFilePart(
+                    file_ref=file_ref,
+                    offset=offset,
+                    length=_DOWNLOAD_CHUNK_SIZE,
+                )
+            )
             part = result.file_part
             if part is None or not part.data:
                 break

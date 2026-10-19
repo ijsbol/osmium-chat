@@ -14,7 +14,6 @@ from logging import DEBUG, Formatter, StreamHandler, getLogger
 
 from osmium_chat import Bot, Context, commands
 
-
 logger = getLogger("osmium_chat")
 logger.setLevel(DEBUG)
 _handler = StreamHandler()
@@ -33,20 +32,24 @@ class CategoryCommands(commands.Commands):
     async def newcategory(self, ctx: Context, *, name: str) -> None:
         assert ctx.community is not None
         category = await ctx.community.create_category(name)
-        await ctx.reply(f"Created category \"{category.name}\" (id {category.id}).")
+        await ctx.reply(f'Created category "{category.name}" (id {category.id}).')
 
     @commands.guild_command("newchannel")
-    async def newchannel(self, ctx: Context, category_name: str, *, channel_name: str) -> None:
+    async def newchannel(
+        self, ctx: Context, category_name: str, *, channel_name: str
+    ) -> None:
         assert ctx.community is not None
         await ctx.community.fetch_channels()
         parent = next(
             (c for c in ctx.community.categories if c.name == category_name), None
         )
         if parent is None:
-            await ctx.reply(f"No category named \"{category_name}\" found.")
+            await ctx.reply(f'No category named "{category_name}" found.')
             return
         channel = await ctx.community.create_channel(channel_name, parent_id=parent.id)
-        await ctx.reply(f"Created #{channel.name} (id {channel.id}) under \"{parent.name}\".")
+        await ctx.reply(
+            f'Created #{channel.name} (id {channel.id}) under "{parent.name}".'
+        )
 
     @commands.guild_command("categories")
     async def categories(self, ctx: Context) -> None:
@@ -62,7 +65,9 @@ class CategoryCommands(commands.Commands):
             lines.append(f"[{cat.name}]: {child_names}")
         uncategorised = [c for c in ctx.community.channels if c.category is None]
         if uncategorised:
-            lines.append(f"(uncategorised): {', '.join(f'#{c.name}' for c in uncategorised)}")
+            lines.append(
+                f"(uncategorised): {', '.join(f'#{c.name}' for c in uncategorised)}"
+            )
         await ctx.reply("\n".join(lines))
 
     @commands.guild_command("deletecategory")
@@ -71,31 +76,35 @@ class CategoryCommands(commands.Commands):
         await ctx.community.fetch_channels()
         target = next((c for c in ctx.community.categories if c.name == name), None)
         if target is None:
-            await ctx.reply(f"No category named \"{name}\" found.")
+            await ctx.reply(f'No category named "{name}" found.')
             return
         for child in list(target.channels):
             await child.delete()
         await target.delete()
-        await ctx.reply(f"Deleted \"{name}\" and {len(target.channels)} child channel(s).")
+        await ctx.reply(
+            f'Deleted "{name}" and {len(target.channels)} child channel(s).'
+        )
 
     @commands.guild_command("movechannel")
-    async def movechannel(self, ctx: Context, channel_name: str, *, category_name: str) -> None:
+    async def movechannel(
+        self, ctx: Context, channel_name: str, *, category_name: str
+    ) -> None:
         assert ctx.community is not None
         await ctx.community.fetch_channels()
         target_channel = next(
             (c for c in ctx.community.channels if c.name == channel_name), None
         )
         if target_channel is None:
-            await ctx.reply(f"No channel named \"{channel_name}\" found.")
+            await ctx.reply(f'No channel named "{channel_name}" found.')
             return
         target_cat = next(
             (c for c in ctx.community.categories if c.name == category_name), None
         )
         if target_cat is None:
-            await ctx.reply(f"No category named \"{category_name}\" found.")
+            await ctx.reply(f'No category named "{category_name}" found.')
             return
         await target_channel.edit(parent_id=target_cat.id)
-        await ctx.reply(f"Moved #{target_channel.name} into \"{target_cat.name}\".")
+        await ctx.reply(f'Moved #{target_channel.name} into "{target_cat.name}".')
 
 
 bot.add_commands(CategoryCommands)

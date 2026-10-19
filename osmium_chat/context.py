@@ -11,13 +11,11 @@ from osmium_chat.user.user import User
 
 if TYPE_CHECKING:
     from osmium_chat.bot import Bot
-    from osmium_chat.commands import Command
     from osmium_chat.button import Button
+    from osmium_chat.commands import Command
 
 
-__all__: tuple[str, ...] = (
-    "Context",
-)
+__all__: tuple[str, ...] = ("Context",)
 
 
 class Context:

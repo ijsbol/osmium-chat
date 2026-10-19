@@ -67,9 +67,7 @@ def _build_channels(
     return list(channel_map.values()), categories
 
 
-__all__: tuple[str, ...] = (
-    "Community",
-)
+__all__: tuple[str, ...] = ("Community",)
 
 
 class Community:
@@ -119,8 +117,12 @@ class Community:
         self.name: str = community.name
         self.username: str | None = community.username
         self.owner: bool = community.owner
-        self.permissions: CommunityPermission = CommunityPermission(community.permissions)
-        self.photo: Photo | None = Photo(community.photo, client) if community.photo else None
+        self.permissions: CommunityPermission = CommunityPermission(
+            community.permissions
+        )
+        self.photo: Photo | None = (
+            Photo(community.photo, client) if community.photo else None
+        )
         self.channels: list[Channel] = channels if channels is not None else []
         self.categories: list[Category] = categories if categories is not None else []
         for ch in self.channels:
@@ -189,11 +191,13 @@ class Community:
             self.name = name
         if username is not None:
             self.username = username
-        await self._client.request(PB_EditCommunity(
-            community_id=self.id,
-            name=name,
-            username=username,
-        ))
+        await self._client.request(
+            PB_EditCommunity(
+                community_id=self.id,
+                name=name,
+                username=username,
+            )
+        )
         return self
 
     async def delete(self) -> None:
@@ -203,10 +207,12 @@ class Community:
     async def add_member(self, user: "int | User") -> None:
         """Add a user to this community."""
         user_id = user if isinstance(user, int) else user.id
-        await self._client.request(PB_AddMember(
-            community_id=self.id,
-            user_id=user_id,
-        ))
+        await self._client.request(
+            PB_AddMember(
+                community_id=self.id,
+                user_id=user_id,
+            )
+        )
 
     async def create_channel(
         self,
@@ -231,12 +237,14 @@ class Community:
             in the refetched channel list.
         """
         before = {c.id for c in (await self.fetch_channels())}
-        await self._client.request(PB_CreateChannel(
-            community_id=self.id,
-            name=name,
-            type=PB_ChannelType(type.value),
-            parent_id=parent_id,
-        ))
+        await self._client.request(
+            PB_CreateChannel(
+                community_id=self.id,
+                name=name,
+                type=PB_ChannelType(type.value),
+                parent_id=parent_id,
+            )
+        )
         await self.fetch_channels()
         created = locate_created(before, self.channels, name)
         if created is None:
@@ -260,11 +268,13 @@ class Community:
         """
         await self.fetch_channels()
         before = {c.id for c in self.categories}
-        await self._client.request(PB_CreateChannel(
-            community_id=self.id,
-            name=name,
-            type=PB_ChannelType(ChannelType.CATEGORY.value),
-        ))
+        await self._client.request(
+            PB_CreateChannel(
+                community_id=self.id,
+                name=name,
+                type=PB_ChannelType(ChannelType.CATEGORY.value),
+            )
+        )
         await self.fetch_channels()
         created = locate_created(before, self.categories, name)
         if created is None:
@@ -300,15 +310,17 @@ class Community:
             the refetched role list.
         """
         before = {role.id for role in await self.fetch_roles()}
-        await self._client.request(PB_CreateRole(
-            community_id=self.id,
-            name=name,
-            permissions=int(permissions),
-            priority=priority,
-            color=color,
-            separated=separated,
-            public=public,
-        ))
+        await self._client.request(
+            PB_CreateRole(
+                community_id=self.id,
+                name=name,
+                permissions=int(permissions),
+                priority=priority,
+                color=color,
+                separated=separated,
+                public=public,
+            )
+        )
         created = locate_created(before, await self.fetch_roles(), name)
         if created is None:
             raise OsmiumChatError(f"Created role {name!r} could not be located")
@@ -343,8 +355,7 @@ class Community:
         result = await self._client.request(PB_GetRoles(community_id=self.id))
         roles = result.community_roles
         self.roles = (
-            [Role(r, self._client) for r in roles.roles]
-            if roles is not None else []
+            [Role(r, self._client) for r in roles.roles] if roles is not None else []
         )
         return self.roles
 
@@ -378,24 +389,29 @@ class Community:
         )
         full_files = files_result.files
         files_by_id = (
-            {f.file_id: f for f in full_files.files}
-            if full_files is not None else {}
+            {f.file_id: f for f in full_files.files} if full_files is not None else {}
         )
 
         self.custom_emojis = []
         for sticker in pack.stickers:
             full = files_by_id.get(sticker.file_id, sticker)
             if full.metadata and full.metadata.custom_emoji:
-                name = full.metadata.custom_emoji.emoji or full.filename or str(full.file_id)
+                name = (
+                    full.metadata.custom_emoji.emoji
+                    or full.filename
+                    or str(full.file_id)
+                )
             else:
                 name = full.filename or str(full.file_id)
-            self.custom_emojis.append(CustomEmoji(
-                emoji_id=full.file_id,
-                name=name,
-                community_id=self.id,
-                pack_id=pack.id,
-                client=self._client,
-            ))
+            self.custom_emojis.append(
+                CustomEmoji(
+                    emoji_id=full.file_id,
+                    name=name,
+                    community_id=self.id,
+                    pack_id=pack.id,
+                    client=self._client,
+                )
+            )
         return self.custom_emojis
 
     async def create_custom_emoji(
@@ -422,10 +438,12 @@ class Community:
         """
         before = {e.id for e in await self.fetch_custom_emojis()}
         sticker = await self._client.upload_emoji_image(image, name, mimetype, self.id)
-        await self._client.request(PB_AddStickerToPack(
-            pack=PB_StickerPackRef(id=self.id),
-            sticker=sticker,
-        ))
+        await self._client.request(
+            PB_AddStickerToPack(
+                pack=PB_StickerPackRef(id=self.id),
+                sticker=sticker,
+            )
+        )
         await self.fetch_custom_emojis()
         created = next((e for e in self.custom_emojis if e.id not in before), None)
         if created is None:

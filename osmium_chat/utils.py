@@ -1,10 +1,7 @@
 from collections.abc import Container, Sequence
 from typing import Protocol, TypeVar
 
-
-__all__: tuple[str, ...] = (
-    "locate_created",
-)
+__all__: tuple[str, ...] = ("locate_created",)
 
 
 class Identifiable(Protocol):
@@ -24,7 +21,9 @@ class Identifiable(Protocol):
 _T = TypeVar("_T", bound=Identifiable)
 
 
-def locate_created(before_ids: Container[object], after: Sequence[_T], name: str) -> _T | None:
+def locate_created(
+    before_ids: Container[object], after: Sequence[_T], name: str
+) -> _T | None:
     """Pick the entity just created out of a freshly fetched list.
 
     Several Osmium create RPCs don't echo the new entity back, so the caller

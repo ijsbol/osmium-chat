@@ -16,15 +16,14 @@ from osmium_protos import (
 
 from osmium_chat.channel import Channel
 from osmium_chat.client import Client
+from osmium_chat.commands import Command, CommandRestriction, Commands, StringView
 from osmium_chat.community import Community
-from osmium_chat.commands import Command, Commands, CommandRestriction, StringView
 from osmium_chat.context import Context
 from osmium_chat.errors import CommandError, CommandNotFound, CommandRestrictionError
+from osmium_chat.interaction import Interaction
 from osmium_chat.member import Member
 from osmium_chat.message import Message
-from osmium_chat.interaction import Interaction
 from osmium_chat.user.user import User
-
 
 EventHandler = Callable[..., Awaitable[None]]
 
@@ -180,7 +179,14 @@ class Bot:
             if cmd_meta is not None:
                 bound = getattr(instance, attr_name)
                 name = cmd_meta.name or attr_name
-                self._add_command(Command(bound, name=name, aliases=cmd_meta.aliases, restriction=cmd_meta.restriction))
+                self._add_command(
+                    Command(
+                        bound,
+                        name=name,
+                        aliases=cmd_meta.aliases,
+                        restriction=cmd_meta.restriction,
+                    )
+                )
                 continue
             listen_meta = getattr(attr, "_listen_meta", None)
             if listen_meta is not None:
@@ -212,8 +218,7 @@ class Bot:
                 event = listen_meta.event
                 handlers = self._listeners.get(event, [])
                 self._listeners[event] = [
-                    h for h in handlers
-                    if getattr(h, "__func__", None) is not attr
+                    h for h in handlers if getattr(h, "__func__", None) is not attr
                 ]
 
     def get_command(self, name: str) -> Command | None:
@@ -295,7 +300,7 @@ class Bot:
         if not content.startswith(self.prefix):
             return
 
-        view = StringView(content[len(self.prefix):])
+        view = StringView(content[len(self.prefix) :])
         name = view.get_word()
         if not name:
             return
@@ -308,10 +313,18 @@ class Bot:
 
         is_dm = ctx.community is None
         if command.restriction is CommandRestriction.DM_ONLY and not is_dm:
-            await self.dispatch("command_error", ctx, CommandRestrictionError(command.name, command.restriction))
+            await self.dispatch(
+                "command_error",
+                ctx,
+                CommandRestrictionError(command.name, command.restriction),
+            )
             return
         if command.restriction is CommandRestriction.COMMUNITY_ONLY and is_dm:
-            await self.dispatch("command_error", ctx, CommandRestrictionError(command.name, command.restriction))
+            await self.dispatch(
+                "command_error",
+                ctx,
+                CommandRestrictionError(command.name, command.restriction),
+            )
             return
 
         try:

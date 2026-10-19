@@ -39,7 +39,9 @@ class Button:
     ) -> None:
         self.label = label
         self._fixed_id = custom_id is not None
-        self.custom_id = custom_id if custom_id is not None else secrets.token_urlsafe(18)
+        self.custom_id = (
+            custom_id if custom_id is not None else secrets.token_urlsafe(18)
+        )
         self._callback = callback
 
     async def on_interaction(self, interaction: "Interaction") -> None:
@@ -82,11 +84,13 @@ class Button:
             raise ValueError("Only interaction buttons can be submitted")
         if message.chat_ref is None:
             raise ValueError("Cannot submit a button without a message chat ref")
-        result = await message._client.request(PB_SubmitInteraction(
-            chat_ref=message.chat_ref,
-            message_id=message.id,
-            data=self.custom_id,
-        ))
+        result = await message._client.request(
+            PB_SubmitInteraction(
+                chat_ref=message.chat_ref,
+                message_id=message.id,
+                data=self.custom_id,
+            )
+        )
         response = result.interaction_response
         return response.message if response is not None else None
 
@@ -141,9 +145,14 @@ def make_button_rows(
     rows: Sequence[Sequence[Button]],
 ) -> PB_SendMessageBotInfoButtons:
     if len(rows) > 5 or any(len(row) > 5 for row in rows):
-        raise ValueError("Messages support at most five button rows of five buttons each")
+        raise ValueError(
+            "Messages support at most five button rows of five buttons each"
+        )
     return PB_SendMessageBotInfoButtons(
-        rows=[PB_SendMessageBotInfoButtonsButtonRow(
-            buttons=[button.to_pb() for button in row],
-        ) for row in rows]
+        rows=[
+            PB_SendMessageBotInfoButtonsButtonRow(
+                buttons=[button.to_pb() for button in row],
+            )
+            for row in rows
+        ]
     )

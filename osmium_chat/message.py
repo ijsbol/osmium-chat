@@ -13,11 +13,12 @@ from osmium_protos import (
     PB_SendMessage,
 )
 
+from osmium_chat.button import Button
 from osmium_chat.content import Content, UnicodeEmoji, parse_content
 from osmium_chat.file import File
 from osmium_chat.forward import ForwardInfo
+from osmium_chat.media import MediaEmbed, MessageMedia
 from osmium_chat.member import Member
-from osmium_chat.media import MessageMedia, MediaEmbed
 from osmium_chat.message_options import (
     MessageCloak,
     MessageQuote,
@@ -25,7 +26,6 @@ from osmium_chat.message_options import (
     make_message_reply_info,
     make_send_reply_to,
 )
-from osmium_chat.button import Button
 from osmium_chat.reaction import Reaction
 from osmium_chat.user.user import User
 
@@ -36,13 +36,14 @@ if TYPE_CHECKING:
     from osmium_chat.emoji import CustomEmoji
 
 
-__all__: tuple[str, ...] = (
-    "Message",
-)
+__all__: tuple[str, ...] = ("Message",)
 
 
-def _to_pb_reaction_emoji(emoji: "CustomEmoji | UnicodeEmoji | str") -> PB_ReactionEmoji:
+def _to_pb_reaction_emoji(
+    emoji: "CustomEmoji | UnicodeEmoji | str",
+) -> PB_ReactionEmoji:
     from osmium_chat.emoji import CustomEmoji as _CustomEmoji
+
     if isinstance(emoji, str):
         return PB_ReactionEmoji(unicode_emoji=emoji)
     if isinstance(emoji, UnicodeEmoji):
@@ -107,7 +108,9 @@ class Message:
             for DMs. Only :attr:`~Community.id` is guaranteed to be meaningful.
         """
         self.id: int = message.message_id
-        self.content_raw: Content = parse_content(message.message, list(message.entities))
+        self.content_raw: Content = parse_content(
+            message.message, list(message.entities)
+        )
         self.content: str = message.message
         self.author_id: int = message.author_id
         self.client_id: int | None = client_id
@@ -119,7 +122,8 @@ class Message:
         )
         self.reply_quote: MessageQuote | None = (
             MessageQuote.from_pb(reply_info.quote)
-            if reply_info is not None and reply_info.quote is not None else None
+            if reply_info is not None and reply_info.quote is not None
+            else None
         )
         self.forward_info: ForwardInfo | None = (
             ForwardInfo(message.forward.date) if message.forward is not None else None
@@ -191,14 +195,18 @@ class Message:
         new_raw = None
         if content is not None:
             new_raw = content if isinstance(content, Content) else Content(content)
-        await self._client.request(PB_EditMessage(
-            chat_ref=self.chat_ref,
-            message_id=self.id,
-            message=new_raw.text if new_raw is not None else None,
-            entities=new_raw.entities if new_raw is not None else [],
-            suppress_embeds=suppress_embeds,
-            buttons=make_bot_info(None, buttons).buttons if buttons is not None else None,
-        ))
+        await self._client.request(
+            PB_EditMessage(
+                chat_ref=self.chat_ref,
+                message_id=self.id,
+                message=new_raw.text if new_raw is not None else None,
+                entities=new_raw.entities if new_raw is not None else [],
+                suppress_embeds=suppress_embeds,
+                buttons=make_bot_info(None, buttons).buttons
+                if buttons is not None
+                else None,
+            )
+        )
         if new_raw is not None:
             self.content_raw = new_raw
             self.content = new_raw.text
@@ -219,10 +227,12 @@ class Message:
         """
         if self.chat_ref is None:
             raise ValueError("Cannot delete a message without a chat ref")
-        await self._client.send_pb(PB_DeleteMessage(
-            chat_ref=self.chat_ref,
-            message_ids=[self.id],
-        ))
+        await self._client.send_pb(
+            PB_DeleteMessage(
+                chat_ref=self.chat_ref,
+                message_ids=[self.id],
+            )
+        )
         remove = getattr(self._client, "remove_buttons", None)
         if remove is not None:
             remove(self.id)
@@ -241,21 +251,25 @@ class Message:
         """
         if self.chat_ref is None:
             raise ValueError("Cannot react to a message without a chat ref")
-        await self._client.send_pb(PB_AddReaction(
-            chat_ref=self.chat_ref,
-            message_id=self.id,
-            emoji=_to_pb_reaction_emoji(emoji),
-        ))
+        await self._client.send_pb(
+            PB_AddReaction(
+                chat_ref=self.chat_ref,
+                message_id=self.id,
+                emoji=_to_pb_reaction_emoji(emoji),
+            )
+        )
 
     async def forward_to(self, channel: "Channel") -> None:
         """Forward this message to another channel."""
         if self.chat_ref is None:
             raise ValueError("Cannot forward a message without a chat ref")
-        await self._client.request(PB_ForwardMessage(
-            chat_ref=channel._chat_ref,
-            from_=self.chat_ref,
-            message_ids=[self.id],
-        ))
+        await self._client.request(
+            PB_ForwardMessage(
+                chat_ref=channel._chat_ref,
+                from_=self.chat_ref,
+                message_ids=[self.id],
+            )
+        )
 
     async def remove_reaction(self, emoji: "CustomEmoji | UnicodeEmoji | str") -> None:
         """Remove a previously added reaction from this message.
@@ -269,12 +283,16 @@ class Message:
         :raises RequestError: If the gateway rejects the request.
         """
         if self.chat_ref is None:
-            raise ValueError("Cannot remove a reaction from a message without a chat ref")
-        await self._client.send_pb(PB_RemoveReaction(
-            chat_ref=self.chat_ref,
-            message_id=self.id,
-            emoji=_to_pb_reaction_emoji(emoji),
-        ))
+            raise ValueError(
+                "Cannot remove a reaction from a message without a chat ref"
+            )
+        await self._client.send_pb(
+            PB_RemoveReaction(
+                chat_ref=self.chat_ref,
+                message_id=self.id,
+                emoji=_to_pb_reaction_emoji(emoji),
+            )
+        )
 
     async def reply_file(
         self,
@@ -309,14 +327,16 @@ class Message:
             send_as_file=send_as_file,
             animated=animated,
         )
-        result = await self._client.request(PB_SendMessage(
-            chat_ref=self.chat_ref,
-            media=[media_ref],
-            reply_to=make_send_reply_to(self.id, quote),
-            suppress_embeds=suppress_embeds,
-            bot_info=make_bot_info(cloak, buttons),
-            client_id=client_id,
-        ))
+        result = await self._client.request(
+            PB_SendMessage(
+                chat_ref=self.chat_ref,
+                media=[media_ref],
+                reply_to=make_send_reply_to(self.id, quote),
+                suppress_embeds=suppress_embeds,
+                bot_info=make_bot_info(cloak, buttons),
+                client_id=client_id,
+            )
+        )
         author = self._client.bot.user
         sent = result.sent_message
         return Message(
@@ -358,15 +378,17 @@ class Message:
         if self.chat_ref is None:
             raise ValueError("Cannot reply to a message without a chat ref")
         content_obj = content if isinstance(content, Content) else Content(content)
-        result = await self._client.request(PB_SendMessage(
-            chat_ref=self.chat_ref,
-            message=content_obj.text,
-            entities=content_obj.entities,
-            reply_to=make_send_reply_to(self.id, quote),
-            suppress_embeds=suppress_embeds,
-            bot_info=make_bot_info(cloak, buttons),
-            client_id=client_id,
-        ))
+        result = await self._client.request(
+            PB_SendMessage(
+                chat_ref=self.chat_ref,
+                message=content_obj.text,
+                entities=content_obj.entities,
+                reply_to=make_send_reply_to(self.id, quote),
+                suppress_embeds=suppress_embeds,
+                bot_info=make_bot_info(cloak, buttons),
+                client_id=client_id,
+            )
+        )
         author = self._client.bot.user
         sent = result.sent_message
         return Message(
